@@ -1,6 +1,7 @@
 #include <SPI.h>
 #include "RF24.h"
-#include <Tile.h>
+#include "Tile.h"
+#include "printf.h"
 
 // digital pins used: 2 = rf; 4,5,6,7 = motorshield; 3,11,12,13 = radio
 // analog pins used: 0 = sensor 1; 1 = sensor 2; 2 = sensor 3; 3 = sensor 4; 4 = sensor 5;
@@ -36,12 +37,12 @@ int xAxis = 0;
 int yAxis = 0;
 
 int followLineDifference = 3;
-int blackThreshold = 60;
+int blackThreshold = 50;
 
-int sensor1White;
-int sensor2White;
-int sensor3White;
-boolean logging = false;
+int sensor1WhiteValue;
+int sensor2WhiteValue;
+int sensor3WhiteValue;
+boolean logging = true;
 int engineStatus; // 0 = off, 1 = straight, 2 = reverse, 3 = left, 4 = wideLeft, 5 = right, 6 = wideRight
 int junction = 0; //followLine = 0, left = 1, straight = 2, right = 3, reverse = 4
 
@@ -52,7 +53,7 @@ void Motor1(int pwm, boolean reverse) {
   }
   else {
     digitalWrite(7, LOW);
-  }
+  }  
 }
 
 void Motor2(int pwm, boolean reverse) {
@@ -70,51 +71,35 @@ void setup() {
   for (i = 4; i <= 7; i++) //For Arduino Motor Shield
     pinMode(i, OUTPUT);  //set pin 4,5,6,7 to output mode
 
-  Serial.begin(9600);
+
+  Serial.begin(57600);
 
   myRadio.begin();
   myRadio.setAutoAck(1);
   myRadio.enableAckPayload();
   myRadio.setRetries(0, 15);
-  //myRadio.setPayloadSize(1);
-  //myRadio.setChannel(115);
-  //myRadio.setPALevel(RF24_PA_MAX);
   //myRadio.setDataRate( RF24_250KBPS ) ;
   myRadio.openWritingPipe(pipes[1]);        // Both radios listen on the same pipes by default, and switch when writing
   myRadio.openReadingPipe(1, pipes[0]);
   myRadio.startListening();
   Serial.println("Setup");
 
-  sensor1White = analogRead(A0);
-  sensor2White = analogRead(A1);
-  receiveMessage();
-  moveLeft();
-  int checkedWhite = 0;
-
-  while (checkedWhite <= 300) {
-    int sensor1 = analogRead(A0);
-    int sensor2 = analogRead(A1);
-    int sensor3 = analogRead(A2);
-    if (sensor1 < sensor1White) {
-      sensor1White = sensor1;
-    }
-    if (sensor2 < sensor2White) {
-      sensor2White = sensor2;
-    }
-    if (sensor3 < sensor3White) {
-      sensor3White = sensor3;
-    }
-    checkedWhite++;
-    delay(5);
+  //sensor1White = analogRead(A0);
+  //sensor2White = analogRead(A1);
+  for(int i = 0; i < 10; i++){
+  sensor1WhiteValue += analogRead(A0);
+  sensor2WhiteValue += analogRead(A1);
+  sensor3WhiteValue += analogRead(A2);
+  printf("value : %d\n", sensor3WhiteValue);
   }
-  while (readSensor(1) < blackThreshold) {
-    //keep turning left until sensor 1 detects black.
-  }
-  Motor1(0, false);
-  Motor2(0, true);
-  delay(300);
-  engineStatus = 0;
-  findLine();
+  
+  sensor1WhiteValue = sensor1WhiteValue / 10;
+  sensor2WhiteValue = sensor2WhiteValue / 10;
+  sensor3WhiteValue = sensor3WhiteValue / 10;
+  
+  printf("White value sensor 1: %d\n", sensor1WhiteValue);
+  printf("White value sensor 2: %d\n", sensor2WhiteValue);
+  printf("White value sensor 3: %d\n", sensor3WhiteValue);
 }
 
 void findLine() {
@@ -123,15 +108,18 @@ void findLine() {
     int sensor1 = readSensor(1);
     int sensor2 = readSensor(2);
     int sensor3 = readSensor(3);
-    if (sensor2 > 50) {
+    if (sensor2 > 70) {
       lineFound++;
     }
     if (sensor1 - followLineDifference > sensor3) {
       moveWideLeft();
+      //Serial.println("sensor1 valued ");
     } else if (sensor3 - followLineDifference > sensor1) {
       moveWideRight();
+      //Serial.println("sensor3 valued");
     } else {
       moveStraight();
+      //Serial.println("sensor2 valued");
     }
   }
   if (logging) {
@@ -143,37 +131,38 @@ void findLine() {
 
 int readSensor(int sensor) { //returns a percentage of how black the sensor is. 0 = white; 100 = black.
   double percentage;
-  int moreThanWhite;
+  int detectedValue;
   int range;
   int sensorValue;
   switch (sensor) {
     case 1: // read sensor 1.
       sensorValue = analogRead(A0);
-      if (sensorValue < sensor1White) {
-        sensor1White = sensorValue;
+      if (sensorValue < sensor1WhiteValue) {
+        sensor1WhiteValue = sensorValue;
       }
-      moreThanWhite = sensorValue - sensor1White;
-      range = 1024 - sensor1White;
+      detectedValue = sensorValue - sensor1WhiteValue;
+      range = 1024 - sensor1WhiteValue;
       break;
     case 2: // read sensor 2.
       sensorValue = analogRead(A1);
-      if (sensorValue < sensor2White) {
-        sensor2White = sensorValue;
+      if (sensorValue < sensor2WhiteValue) {
+        sensor2WhiteValue = sensorValue;
       }
-      moreThanWhite = sensorValue - sensor2White;
-      range = 1024 - sensor2White;
+      detectedValue = sensorValue - sensor2WhiteValue;
+      range = 1024 - sensor2WhiteValue;
       break;
     case 3: // read sensor 3.
       sensorValue = analogRead(A2);
-      if (sensorValue < sensor3White) {
-        sensor3White = sensorValue;
+      if (sensorValue < sensor3WhiteValue) {
+        sensor3WhiteValue = sensorValue;
       }
-      moreThanWhite = sensorValue - sensor3White;
-      range = 1024 - sensor3White;
+      detectedValue = sensorValue - sensor3WhiteValue;
+      range = 1024 - sensor3WhiteValue;
       break;
   }
-  if (moreThanWhite < range) {
-    percentage = ((double) moreThanWhite / (double) range) * 100.0;
+    
+  if (detectedValue < range) {
+    percentage = ((double) detectedValue / (double) range) * 100.0;
   }
   return (int) percentage;
 }
@@ -429,28 +418,27 @@ void sendMessage(int tile, int tileOrientation, int x, int y, int robotOrientati
   bool received = false;
   // First, stop listening so we can talk.
   Package data = {packageId, tile, tileOrientation, x, y, robotOrientation};
-  receiveMessage();
+  //receiveMessage();
   myRadio.openWritingPipe(pipes[0]);
   myRadio.openReadingPipe(1, pipes[1]);
   myRadio.stopListening();
-  while (!received) {
+  /*while (!received) {
     if (!myRadio.write(&data, sizeof(data))) {
       Serial.println("failed.");
     } else {
       received = true;
     }
-  }
+  }*/
   myRadio.openWritingPipe(pipes[1]);
   myRadio.openReadingPipe(1, pipes[0]);
   myRadio.startListening();
-  receiveMessage();
+  //receiveMessage();
 }
 
 void receiveMessage() {
-
   Serial.println("startListening");
   Package data;
-  while (myRadio.available()) {
+  /*while (myRadio.available()) {
     Serial.println("readPackage");
     myRadio.read(&data, sizeof(data) );
     if (data.tile >= 0) {
@@ -472,8 +460,7 @@ void receiveMessage() {
       Serial.println(data.robotOrientation);
       addTile(data.tile, data.tileOrientation, data.xCoordinate, data.yCoordinate, data.robotOrientation);
     }
-  }
-
+  }*/
 }
 
 //make a choice based on the orientation of the robot, tile type and tile orientation. Always try to go right, if not go straight, if not go left or turn around.
@@ -735,26 +722,37 @@ boolean checkDirectionPossibility(int tileType, int tileOrientation, int moveDir
   return false;
 }
 
-void loop() {
-  if (engineStatus != 0) {
-    int sensor1 = readSensor(1);
-    int sensor2 = readSensor(2);
-    int sensor3 = readSensor(3);
-    if (junction == 0) {
-      if (sensor1 > blackThreshold || sensor3 > blackThreshold) {
-        detectIntersection();
-      } else if (sensor1 < blackThreshold && sensor2 < blackThreshold && sensor3 < blackThreshold) {
-        detectIntersection();
-      } else if (sensor1 - followLineDifference > sensor3) {
-        moveWideLeft();
-      } else if (sensor3 - followLineDifference > sensor1) {
-        moveWideRight();
-      } else {
-        moveStraight();
-      }
-    }
+bool done = false;
 
-    if (junction == 1) {
+void loop() {
+  int sensor1 = readSensor(1);
+  int sensor2 = readSensor(2);
+  int sensor3 = readSensor(3);
+
+  if(sensor2 > blackThreshold && sensor1 < blackThreshold && sensor3 < blackThreshold){
+    moveStraight();
+  } else if(sensor1 > blackThreshold){
+    moveWideLeft();
+  }else if(sensor3 > blackThreshold){
+    moveWideRight();
+  }
+
+ //if (engineStatus != 0) {
+    //if (junction == 0) {
+//      if (sensor1 > blackThreshold && sensor3 > blackThreshold) {
+//        moveWideLeft();
+//      } else if (sensor1 < blackThreshold && sensor2 < blackThreshold && sensor3 < blackThreshold) {
+//        moveStraight();
+//      } else if (sensor1 > blackThreshold) {
+//        moveWideLeft();
+//      } else if (sensor3 > blackThreshold) {
+//        moveWideRight();
+//      } else {
+//        moveStraight();
+//      }
+    //}
+
+    /*if (junction == 1) {
       receiveMessage();
       orientation--;
       if (orientation < 0) {
@@ -808,5 +806,5 @@ void loop() {
     }
   } else {
     receiveMessage();
-  }
+  }*/
 }

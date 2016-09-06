@@ -1,5 +1,5 @@
-#ifndef Tile
-#define Tile
+#ifndef TILE_H
+#define TILE_H
 
 class Tile
 {
@@ -10,13 +10,13 @@ class Tile
 	void setSouth(Tile*);
 	void setWest(Tile*);
 	
-	Tile getNorth();
-	Tile getEast();
-	Tile getSouth();
-	Tile getWest();
+	Tile* getNorth();
+	Tile* getEast();
+	Tile* getSouth();
+	Tile* getWest();
 	
 	int getOrientation();
-	void setOrientation();
+	void setOrientation(int);
 	
 	int getType();
 	void setType(int);
@@ -37,4 +37,21 @@ class Tile
 	void setOptionEast(bool);
 	void setOptionWest(bool);
 	
-}
+private:
+  Tile* north;
+  Tile* east;
+  Tile* south;
+  Tile* west;
+
+  int orientation;
+  int type;
+  int xCoordinate;
+  int yCoordinate;
+
+  bool optionNorth;
+  bool optionSouth;
+  bool optionEast;
+  bool optionWest;
+};
+
+#endif
