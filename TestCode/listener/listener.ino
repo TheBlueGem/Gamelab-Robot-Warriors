@@ -2,6 +2,7 @@
 #include "nRF24L01.h"
 #include "RF24.h"
 #include "Tile.h"
+#include "printf.h"
 
 Tile* tiles[50];
 int robotOrientation[50];
@@ -12,11 +13,16 @@ int amountOfPackages = 0;
 RF24 myRadio (9, 10);
 const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL };
 
+
+int msg[1];
+int resp[1];
+String theMessage = "";
+
 struct package {
-  String position;
-  int sensor1;
-  int sensor2;
-  int sensor3;  
+  unsigned long id;
+  float sensor1;
+  float sensor2;
+  float sensor3;
   //  char text[20];
 };
 
@@ -27,10 +33,11 @@ typedef struct package Package;
 void setup()
 {
   Serial.begin(57600);
+  printf_begin();
   //delay(1000);
   myRadio.begin();
   //myRadio.setDataRate( RF24_250KBPS ) ;
-  myRadio.openReadingPipe(1,pipes[1]);
+  myRadio.openReadingPipe(1, pipes[1]);
   myRadio.startListening();
   Serial.print("setup ");
 }
@@ -115,48 +122,106 @@ boolean checkDirectionPossibility(int tileType, int tileOrientation, int moveDir
   return false;
 }
 
-void receiveMessage() {
-  
-}
-
-void loop(void) {  
-  if ( Serial.available() )
+void printMessage(unsigned long id) {
+  switch (id)
   {
-    char c = toupper(Serial.read());
-    if ( c == 'T' )
-    {
-      printf("*** CHANGING TO TRANSMIT ROLE -- PRESS 'R' TO SWITCH BACK\n\r");
-
-      // Become the primary transmitter (ping out)
-    
-      myRadio.openWritingPipe(pipes[0]);
-      myRadio.openReadingPipe(1,pipes[1]);
-    }
+    case 0: // arrive from right side of the corner.
+      Serial.println("Arrived from the right side of a corner...");
+      break;
+    case 1: // arrive from left side of the corner.
+      Serial.println("Arrived from the left side of a corner...");
+      break;
+    case 2: // arrive from bottom side of a T tile.
+      Serial.println("Arrived fron the bottom side of a T tile...");
+      break;
+    case 3: // arrive from left side of the T.
+      Serial.println("Arrived fron the left side of a T tile...");
+      break;
+    case 4: // arrive from right side of the T.
+      Serial.println("Arrived fron the right side of a T tile...");
+      break;
+    case 5:
+      Serial.println("Arrived on an intersection...");
+      break;
+    case 6:
+      Serial.println("Finished!");
+      break;
+    case 7:
+      Serial.println("Dead end...");
+      break;
   }
 
-  //receiveMessage(); 
+}
+
+int expectedId = 1;
+unsigned long lastMessageId = -1;
+void loop(void) {
+
+  //receiveMessage();
   if (myRadio.available()) {
-    Serial.println("radio is beschickbaar ");
-    Package data;
-    unsigned long time;
-    
-    while (myRadio.available()) {
-      myRadio.read(&data, sizeof(data) ); 
-      delay(20);
-      }
-      Serial.println(data.position);
-      Serial.println(data.sensor1);
-      Serial.println(data.sensor2);
-      Serial.println(data.sensor3);
+
+   
+    unsigned long id;
+    myRadio.read(&id, sizeof(unsigned long));
+      
+     if(id != lastMessageId) {
+      printMessage(id);
+      //Serial.println("radio is beschickbaar ");
+      lastMessageId = id;
+     }
+    /* Package data1 = {1, 90, 70, 30};
+       Package data;
+       unsigned long time = 80;
+       if(!expectedId == data.id){
+         expectedId = data.id;
+       }
+       Serial.println("radio is beschickbaar ");
+       myRadio.read(&data, sizeof(Package));
+       if(data.id == expectedId)
+       {
+       char buf[16];
+       dtostrf(data.sensor1, 2, 0, buf);
+        char buf1[16];
+       dtostrf(data.sensor2, 2, 0, buf1);
+        char buf2[16];
+       dtostrf(data.sensor3, 2, 0, buf2);
+       // Serial.println(data.position);
+       printf("Sensor 1 %s \n\r", buf);
+       printf("Sensor 2 %s \n\r", buf1);
+       printf("Sensor 3 %s \n\r", buf2);
+       expectedId++;
+       }
+              // Serial.println(time);
+       delay(20);
+
+
 
       // First, stop listening so we can talk
       myRadio.stopListening();
 
       // Send the final one back.
-      myRadio.write( &time, sizeof(unsigned long) );
-     Serial.println("sent shit");
+      //  int sendback = expectedId + 1;
+      myRadio.write( &expectedId, sizeof(expectedId) );
+      Serial.println("sent shit");
+      Serial.println(expectedId);
 
       // Now, resume listening so we catch the next packets.
       myRadio.startListening();
+    */
+
+  }
+
+  if ( Serial.available() )
+  {
+    char c = toupper(Serial.read());
+    if ( c == 'T' )
+    {
+      Serial.println("CHANGING TO TRANSMIT ROLE -- PRESS 'R' TO SWITCH BACK");
+
+      // Become the primary transmitter (ping out)
+
+      myRadio.openWritingPipe(pipes[0]);
+      myRadio.openReadingPipe(1, pipes[1]);
+    }
   }
 }
