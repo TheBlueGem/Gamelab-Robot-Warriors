@@ -15,7 +15,7 @@ int amountOfPackages = 0;
 RF24 myRadio(9, 10);
 
 // Topology
-const uint64_t pipes[2] = { 0xABCDABCD71LL, 0x544d52687CLL }; // Radio pipe addresses for the 2 nodes to communicate.
+const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL }; // Radio pipe addresses for the 2 nodes to communicate.
 
 struct package
 {
@@ -396,7 +396,7 @@ void readTile(int type, int side)
   case 0: // arrive from right side of the corner.
     if(logging)
     {
-      logString(1,"Arrived from the right side of a corner...");
+      sendLogMessage(0);
     }
     arrivalDirection = orientation + 1;
     //addTile(1, orientation + 1, xPosition, yPosition, orientation);
@@ -405,7 +405,7 @@ void readTile(int type, int side)
   case 1: // arrive from left side of the corner.
     if(logging)
     {
-      logString(2, "Arrived from the left side of a corner...");
+      sendLogMessage(1);
     }
     arrivalDirection = orientation;
     moveWideRight();
@@ -415,7 +415,7 @@ void readTile(int type, int side)
   case 2: // arrive from bottom side of a T tile.
     if(logging)
     {
-      logString(3, "Arrived fron the bottom side of a T tile...");
+      sendLogMessage(2);
     }
     moveWideLeft();
     //addTile(2, orientation + 1, xPosition, yPosition, orientation);
@@ -425,7 +425,7 @@ void readTile(int type, int side)
   case 3: // arrive from left side of the T.
     if(logging)
     {
-      logString(4, "Arrived fron the left side of a T tile...");
+      sendLogMessage(3);
     }
     //addTile(2, orientation, xPosition, yPosition, orientation);
     arrivalDirection = orientation;    
@@ -435,7 +435,7 @@ void readTile(int type, int side)
   case 4: // arrive from right side of the T.
     if(logging)
     {
-      logString(5, "Arrived fron the right side of a T tile...");
+      sendLogMessage(4);
     }
     //addTile(2, orientation + 2, xPosition, yPosition, orientation);
     arrivalDirection = orientation + 2;    
@@ -445,7 +445,7 @@ void readTile(int type, int side)
   case 5:
     if(logging)
     {
-      logString(6, "Arrived on an intersection...");
+      sendLogMessage(5);
     }
     //addTile(3, 0, xPosition, yPosition, orientation);
     arrivalDirection = 0;
@@ -466,7 +466,7 @@ void detectEnd()
   {
     if(logging)
     {
-      logString(7, "Finished!");
+      sendLogMessage(6);
     }
     //addTile(4, orientation, xPosition, yPosition, orientation);
     //sendMessage(4, orientation, xPosition, yPosition, orientation);
@@ -475,7 +475,7 @@ void detectEnd()
   {
     if(logging)
     {
-      logString(8, "Dead end...");
+      sendLogMessage(7);
     }
     //addTile(0, orientation, xPosition, yPosition, orientation);
     //sendMessage(0, orientation, xPosition, yPosition, orientation);
@@ -495,6 +495,18 @@ void logString(int messageId, String message)
 
 int currentPackageId = 0;
 
+void sendLogMessage(int messageId){
+  if(messageId != lastMessageId) {
+  myRadio.stopListening();
+  unsigned long id = messageId;
+  bool ok = myRadio.write( &id, sizeof(unsigned long) );
+  if(ok){
+    Serial.println("Message Send");
+  }
+   lastMessageId = messageId;
+  }
+  
+}
 void sendMessage(int tile, int tileOrientation, int x, int y, int robotOrientation)
 {
   //bool received = false;
