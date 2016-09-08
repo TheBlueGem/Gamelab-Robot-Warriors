@@ -101,11 +101,13 @@ void setup()
   leftSensorWhiteValue = leftSensorWhiteValue / 10;
   middleSensorWhiteValue = middleSensorWhiteValue / 10;
   rightSensorWhiteValue = rightSensorWhiteValue / 10;
+
+  printf("Values left: %d middle: %d right: %d", leftSensorWhiteValue, middleSensorWhiteValue, rightSensorWhiteValue);
   
   Motor1(0, false);
   Motor2(0, true);
   movementMode = 0;
-  Serial.println("Setup");
+  Serial.println("Setup Done");
   findLine();
 }
 
@@ -114,7 +116,6 @@ void findLine()
   Serial.println("Finding line....");
   unsigned long startTime = millis();
   unsigned long searchTime = 0;
-
 
   int left = 0;
   int middle = 0;
@@ -157,28 +158,28 @@ int readSensor(int sensor)
   {
   case 1: // read sensor 1.
     sensorValue = analogRead(A0);    
-    if(sensorValue < leftSensorWhiteValue)
+    /*if(sensorValue < leftSensorWhiteValue)
     {
       leftSensorWhiteValue = sensorValue;
-    }
+    }*/
     detectedValue = sensorValue - leftSensorWhiteValue;
     range = 1024 - leftSensorWhiteValue;
     break;
   case 2: // read sensor 2.
     sensorValue = analogRead(A1);
-    if(sensorValue < middleSensorWhiteValue)
+    /*if(sensorValue < middleSensorWhiteValue)
     {
       middleSensorWhiteValue = sensorValue;
-    }
+    }*/
     detectedValue = sensorValue - middleSensorWhiteValue;
     range = 1024 - middleSensorWhiteValue;
     break;
   case 3: // read sensor 3.
     sensorValue = analogRead(A2);
-    if(sensorValue < rightSensorWhiteValue)
+    /*if(sensorValue < rightSensorWhiteValue)
     {
       rightSensorWhiteValue = sensorValue;
-    }
+    }*/
     detectedValue = sensorValue - rightSensorWhiteValue;
     range = 1024 - rightSensorWhiteValue;
     break;
@@ -331,7 +332,8 @@ void turnOff()
 }*/
 
 void detectTile(int left, int middle, int right)
-{    
+{
+  
   if(left > blackThreshold)
   {
     if(middle > blackThreshold)
@@ -367,11 +369,8 @@ void detectTile(int left, int middle, int right)
       }
       else
       { //wbw
-        if(logging)
-        {
-          logString(0, "Moving Straight...");
-        }
-      }
+        readTile(2, 0);
+     }
     }
     else
     {
@@ -381,19 +380,23 @@ void detectTile(int left, int middle, int right)
       }
       else
       { //www
+        printf("Values left: %d middle: %d right: %d\n", left, middle, right);
         detectEnd();
       }
     }
   }
 }
 
-void readTile(int type, int side)
+/**
+* Read what kind of Tile we have encountered
+*/
+void readTile(int type, int caseId)
 {
-  int arrivalDirection = 0; 
-  
-  switch(side)
+  int arrivalDirection = -1; 
+    
+  switch(caseId)
   {
-  case 0: // arrive from right side of the corner.
+  case 0: // Arrived from right side of the corner.
     if(logging)
     {
       sendLogMessage(0);
@@ -402,7 +405,7 @@ void readTile(int type, int side)
     //addTile(1, orientation + 1, xPosition, yPosition, orientation);
     moveWideLeft();
     break;
-  case 1: // arrive from left side of the corner.
+  case 1: // Arrived from left side of the corner.
     if(logging)
     {
       sendLogMessage(1);
@@ -412,7 +415,7 @@ void readTile(int type, int side)
     //addTile(1, orientation, xPosition, yPosition, orientation);    
     break;
   
-  case 2: // arrive from bottom side of a T tile.
+  case 2: // Arrived from bottom side of a T tile.
     if(logging)
     {
       sendLogMessage(2);
@@ -422,7 +425,7 @@ void readTile(int type, int side)
     arrivalDirection = orientation + 1;
     break;
 
-  case 3: // arrive from left side of the T.
+  case 3: // Arrived from left side of the T.
     if(logging)
     {
       sendLogMessage(3);
@@ -432,7 +435,7 @@ void readTile(int type, int side)
     moveWideRight();
     break;
 
-  case 4: // arrive from right side of the T.
+  case 4: // Arrived from right side of the T.
     if(logging)
     {
       sendLogMessage(4);
@@ -442,7 +445,7 @@ void readTile(int type, int side)
     moveWideLeft();
     break;
 
-  case 5:
+  case 5: // Arrived at an intersection.
     if(logging)
     {
       sendLogMessage(5);
@@ -451,35 +454,57 @@ void readTile(int type, int side)
     arrivalDirection = 0;
     moveWideLeft();
     break;
+
+  case 6:
+    if(logging)
+    {
+      sendLogMessage(8);
+    }
+
+    moveStraight();
+    break;
   }
+
+  
+  
   //makeMove();
 }
+
+int startTime = millis();
+int elapsedTime = 0;
 
 void detectEnd()
 {
   //moveStraight();
-
-  int left = readSensor(1);
-  int middle = readSensor(2);
-  int right = readSensor(3);
-  if(left > blackThreshold && middle > blackThreshold && right > blackThreshold)
+  if(elapsedTime < 1000)
   {
-    if(logging)
-    {
-      sendLogMessage(6);
-    }
-    //addTile(4, orientation, xPosition, yPosition, orientation);
-    //sendMessage(4, orientation, xPosition, yPosition, orientation);
+    elapsedTime = millis() - startTime;
   }
   else
   {
-    if(logging)
+    int left = readSensor(1);
+    int middle = readSensor(2);
+    int right = readSensor(3);
+    if(left > blackThreshold && middle > blackThreshold && right > blackThreshold)
     {
-      sendLogMessage(7);
+      if(logging)
+      {
+        sendLogMessage(6);
+      }
+      //addTile(4, orientation, xPosition, yPosition, orientation);
+      //sendMessage(4, orientation, xPosition, yPosition, orientation);
     }
-    //addTile(0, orientation, xPosition, yPosition, orientation);
-    //sendMessage(0, orientation, xPosition, yPosition, orientation);
-    //makeMove();
+    else
+    {
+      if(logging)
+      {
+        sendLogMessage(7);
+      }
+      //addTile(0, orientation, xPosition, yPosition, orientation);
+      //sendMessage(0, orientation, xPosition, yPosition, orientation);
+      //makeMove();
+    }
+    elapsedTime = 0;
   }
 }
 
@@ -1002,6 +1027,9 @@ void loop()
     detectTile(left, middle, right);
   }
 }
+
+
+
 
 
 

@@ -125,6 +125,9 @@ boolean checkDirectionPossibility(int tileType, int tileOrientation, int moveDir
 void printMessage(unsigned long id) {
   switch (id)
   {
+    case -1:
+      Serial.println("Unrecognized log message");
+      break;
     case 0: // arrive from right side of the corner.
       Serial.println("Arrived from the right side of a corner...");
       break;
@@ -148,6 +151,9 @@ void printMessage(unsigned long id) {
       break;
     case 7:
       Serial.println("Dead end...");
+      break;
+    case 8:
+      Serial.println("Moving Straight...");
       break;
   }
 
