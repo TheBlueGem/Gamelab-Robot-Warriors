@@ -155,6 +155,18 @@ void printMessage(unsigned long id) {
     case 8:
       Serial.println("Moving Straight...");
       break;
+    case 9:
+      Serial.println("Moving left...");
+      break;
+    case 10:
+      Serial.println("Moving right...");
+      break;
+    case 11:
+      Serial.println("Moving left wide...");
+      break;
+    case 12:
+      Serial.println("Moving right wide...");
+      break;
   }
 
 }
@@ -166,15 +178,15 @@ void loop(void) {
   //receiveMessage();
   if (myRadio.available()) {
 
-   
+
     unsigned long id;
     myRadio.read(&id, sizeof(unsigned long));
-      
-     if(id != lastMessageId) {
+
+    if (id != lastMessageId) {
       printMessage(id);
       //Serial.println("radio is beschickbaar ");
       lastMessageId = id;
-     }
+    }
     /* Package data1 = {1, 90, 70, 30};
        Package data;
        unsigned long time = 80;
