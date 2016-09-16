@@ -31,7 +31,10 @@
 #include <QTRSensors.h>  // Pololu QTR Library 
 #include "printf.h"
 #include "RF24.h"
-
+#define rightMaxSpeed 150 // max speed of the robot
+#define leftMaxSpeed 150 // max speed of the robot
+#define rightBaseSpeed 100 // this is the speed at which the motors should spin when the robot is perfectly on the line
+#define leftBaseSpeed 100 
 
 //line sensor defines
 #define NUM_SENSORS   3    // number of sensors used
@@ -47,6 +50,8 @@ QTRSensorsAnalog qtrrc((unsigned char[]) {
 }, NUM_SENSORS  );
 unsigned int sensorValues[NUM_SENSORS]; // array with individual sensor reading values
 unsigned int line_position = 0; // value from 0-7000 to indicate position of line between sensor 0 - 7
+
+int lastError = 0;
 
 int leftSensor = 0;
 int rightSensor = 0;
@@ -76,10 +81,11 @@ int calSpeed = 255;   // tune value motors will run while auto calibration sweep
 // Proportional Control loop vars
 float error = 0;
 float previousError = 0;
+float totalError = 0;
 float PV = 0 ; // Process Variable value calculated to adjust speeds and keep on line
-float kp = 1;  // This is the Proportional value. Tune this value to affect follow_line performance
-float kd = 0.5;
-float ki = 0;
+float kp = 0.4;  // This is the Proportional value. Tune this value to affect follow_line performance
+float kd = 0.2;
+float ki = 0.5;
 int m1Speed = 0; // (Left motor)
 int m2Speed = 0; // (Right motor)
 
@@ -192,7 +198,7 @@ void loop() // main loop
   unsigned int line_position = qtrrc.readLine(sensorValues);
   // printf("Left sensor value: %d Mid sensor value: %d Right sensor value %d \n" , sensorValues[0], sensorValues[1], sensorValues[2]);
   // begin line
-  readWideSensors();
+  //readWideSensors();
   follow_line(line_position);
 
 
@@ -208,100 +214,37 @@ void loop() // main loop
 //  http://www.instructables.com/id/Basic-PD-Proportional-Derivative-Line-Follower/
 
 void follow_line(int line_position) //follow the line
-{
+{  
+  int error = line_position - 1000;
 
-  // 0 is far Right sensor while 7 (7000 return) is far Left sensor
+  int motorSpeed = kp * error + kd * (error - lastError) + ki * totalError;
+  lastError = error;
 
-  switch (line_position)
-  {
+  int rightMotorSpeed = rightBaseSpeed + motorSpeed;
+  int leftMotorSpeed = leftBaseSpeed - motorSpeed;
+  
+  if (rightMotorSpeed > rightMaxSpeed ) rightMotorSpeed = rightMaxSpeed; // prevent the motor from going beyond max speed
+  if (leftMotorSpeed > leftMaxSpeed ) leftMotorSpeed = leftMaxSpeed; // prevent the motor from going beyond max speed
+  if (rightMotorSpeed < 0) rightMotorSpeed = 0; // keep the motor speed positive
+  if (leftMotorSpeed < 0) leftMotorSpeed = 0; // keep the motor speed positive
 
 
-    // Line has moved off the left edge of sensor
-    // This will make it turn fast to the left
-    case 2000:
       digitalWrite(dir_a, HIGH);
-      analogWrite(pwm_a, 100);
-      digitalWrite(dir_b, HIGH);
-      analogWrite(pwm_b, 100);
-      // Serial.println(line_position);
-      //  Serial.println("Turning Left");
-      break;
-
-    // Line had moved off the left edge of sensor
-
-    // Line had moved off the right edge of sensor
-    // This will make it turn fast to the right
-
-    case 0:
-      digitalWrite(dir_a, LOW);
-      analogWrite(pwm_a, 100);
+      analogWrite(pwm_a, rightMotorSpeed);
       digitalWrite(dir_b, LOW);
-      analogWrite(pwm_b, 100);
-
-      //   Serial.println(line_position);
-      //  Serial.println("Turning Right");
-      break;
-
-    // The line is still within the sensors.
-    // This will calculate adjusting speed to keep the line in center.
-    default:
-      previousError = error;
-      error = (float)line_position - 1000; // 1000 is center measure of 2000 far left and 0 on far right
-
-
-      // This sets the motor speed based on a proportional only formula.
-      // kp is the floating-point proportional constant you need to tune.
-      // Maybe start with a kp value around 1.0, tuned in declared Proportional Control loop vars at the top of this code.
-      // Note that it's very important you get your signs right, or else the
-      // control loop will be unstable.
-
-      // calculate the new Process Variable
-      // this is the value that will be used to alter the speeds
-      PV = (kp * error) + (kd * (error - previousError));
-      //PV = kp * error;
-
-      // this section limits the PV (motor speed pwm value)
-      // limit PV to 55
-      if (PV > 55)
-      {
-        PV = 55;
-      }
-
-      if (PV < -55)
-      {
-        PV = -55;
-      }
-
-      // adjust motor speeds to correct the path
-      // Note that if PV > 0 the robot needs to turn left
-
-      m1Speed = 100 - PV;
-      m2Speed = 100 + PV;
-
-      //set motor speeds
-
-      if (m1Speed > 100) {
-        m1Speed = 100;
-      }
-      if (m2Speed > 100) {
-        m2Speed = 100;
-      }
-      digitalWrite(dir_a, HIGH);
-      analogWrite(pwm_a, m1Speed);
-      digitalWrite(dir_b, LOW);
-      analogWrite(pwm_b, m2Speed);
+      analogWrite(pwm_b, leftMotorSpeed);
 
       //Serial.println("Going straight");
+      
+  
       Serial.print("Process Variable: ");
       Serial.print(PV);
       Serial.print(" Line position: ");
-      Serial.print(error);
+      Serial.print(line_position);
       Serial.print(" Motor 1: ");
-      Serial.print(m1Speed);
+      Serial.print(rightMotorSpeed);
       Serial.print(" Motor 2: ");
-      Serial.println(m2Speed);
-      break;
-  }
+      Serial.println(leftMotorSpeed);
 
 } // end follow_line
 

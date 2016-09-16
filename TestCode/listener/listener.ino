@@ -32,14 +32,12 @@ typedef struct package Package;
 
 void setup()
 {
-  Serial.begin(57600);
+  Serial.begin(9600);
   printf_begin();
-  //delay(1000);
   myRadio.begin();
-  //myRadio.setDataRate( RF24_250KBPS ) ;
   myRadio.openReadingPipe(1, pipes[1]);
   myRadio.startListening();
-  Serial.print("setup ");
+  Serial.println("setup ");
 }
 
 void addTile(int tileType, int tileOrientation, int x, int y, int rOrientation) {
@@ -177,16 +175,11 @@ void loop(void) {
 
   //receiveMessage();
   if (myRadio.available()) {
-
-
     unsigned long id;
     myRadio.read(&id, sizeof(unsigned long));
 
-    if (id != lastMessageId) {
       printMessage(id);
-      //Serial.println("radio is beschickbaar ");
-      lastMessageId = id;
-    }
+  
     /* Package data1 = {1, 90, 70, 30};
        Package data;
        unsigned long time = 80;
@@ -222,10 +215,10 @@ void loop(void) {
       myRadio.write( &expectedId, sizeof(expectedId) );
       Serial.println("sent shit");
       Serial.println(expectedId);
-
+ */
       // Now, resume listening so we catch the next packets.
       myRadio.startListening();
-    */
+   
 
   }
 
