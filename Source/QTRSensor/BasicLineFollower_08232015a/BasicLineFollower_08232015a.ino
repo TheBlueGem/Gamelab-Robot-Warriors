@@ -30,6 +30,8 @@
 //QTRSensors folder must be placed in your arduino libraries folder
 #include <QTRSensors.h>  // Pololu QTR Library 
 #include "printf.h"
+#include "RF24.h"
+
 
 //line sensor defines
 #define NUM_SENSORS   3    // number of sensors used
@@ -49,6 +51,17 @@ unsigned int line_position = 0; // value from 0-7000 to indicate position of lin
 int leftSensor = 0;
 int rightSensor = 0;
 
+int leftSensorWhiteValue;
+int rightSensorWhiteValue;
+
+int blackThreshold = 60;
+
+RF24 myRadio(9, 10);
+
+const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL }; // Radio pipe addresses for the 2 nodes to communicate.
+
+boolean logging = true;
+
 // ArduMoto motor driver vars
 // pwm_a/b sets speed.  Value range is 0-255.  For example, if you set the speed at 100 then 100/255 = 39% duty cycle = slow
 // dir_a/b sets direction.  LOW is Forward, HIGH is Reverse
@@ -62,8 +75,11 @@ int calSpeed = 255;   // tune value motors will run while auto calibration sweep
 
 // Proportional Control loop vars
 float error = 0;
+float previousError = 0;
 float PV = 0 ; // Process Variable value calculated to adjust speeds and keep on line
 float kp = 1;  // This is the Proportional value. Tune this value to affect follow_line performance
+float kd = 0.5;
+float ki = 0;
 int m1Speed = 0; // (Left motor)
 int m2Speed = 0; // (Right motor)
 
@@ -84,6 +100,10 @@ void setup()
   analogWrite(pwm_a, 0);
   analogWrite(pwm_b, 0);
 
+  myRadio.begin();
+  myRadio.openWritingPipe(pipes[1]);        // The radios need two pipes to communicate. One reading pipe and one writing pipe.
+  myRadio.openReadingPipe(1, pipes[0]);
+  myRadio.startListening();                 // Switch to reading pipe
 
 
   // delay to allow you to set the robot on the line, turn on the power,
@@ -97,21 +117,21 @@ void setup()
 
     // auto calibration sweeping left/right, tune 'calSpeed' motor speed at declaration
     // just high enough all sensors are passed over the line. Not too fast.
-    /*  if (i == 0 || i == 60) // slow sweeping turn right to pass sensors over line
+    /* if (i == 0 || i == 60) // slow sweeping turn right to pass sensors over line
       {
-        digitalWrite(dir_a, LOW);
-        analogWrite(pwm_a, calSpeed);
-        digitalWrite(dir_b, LOW);
-        analogWrite(pwm_b, calSpeed);
+       digitalWrite(dir_a, LOW);
+       analogWrite(pwm_a, calSpeed);
+       digitalWrite(dir_b, LOW);
+       analogWrite(pwm_b, calSpeed);
       }
 
       else if (i == 20 || i == 100) // slow sweeping turn left to pass sensors over line
       {
-        digitalWrite(dir_a, HIGH);
-        analogWrite(pwm_a, calSpeed);
-        digitalWrite(dir_b, HIGH);
-        analogWrite(pwm_b, calSpeed);
-      }*/
+       digitalWrite(dir_a, HIGH);
+       analogWrite(pwm_a, calSpeed);
+       digitalWrite(dir_b, HIGH);
+       analogWrite(pwm_b, calSpeed);
+    */
 
     qtrrc.calibrate(); // reads all sensors with the define set 2500 microseconds (25 milliseconds) for sensor outputs to go low.
     //printf("Left sensor value: %d Mid sensor value: %d Right sensor value %d \n", sensorValues[0], sensorValues[1], sensorValues[2]);
@@ -157,6 +177,8 @@ void setup()
     Serial.print(qtrrc.calibratedMaximumOn[i]);
     Serial.print(' ');
   }
+
+
   Serial.println("Setup Done");
 } // end setup
 
@@ -165,14 +187,17 @@ void setup()
 void loop() // main loop
 {
 
+
   // read calibrated sensor values and obtain a measure of the line position from 0 to 7000
   unsigned int line_position = qtrrc.readLine(sensorValues);
   // printf("Left sensor value: %d Mid sensor value: %d Right sensor value %d \n" , sensorValues[0], sensorValues[1], sensorValues[2]);
   // begin line
- // follow_line(line_position);
   readWideSensors();
+  follow_line(line_position);
+
+
+
   //
-  delay(1000);
 }  // end main loop
 
 
@@ -195,11 +220,11 @@ void follow_line(int line_position) //follow the line
     // This will make it turn fast to the left
     case 2000:
       digitalWrite(dir_a, HIGH);
-      analogWrite(pwm_a, 200);
+      analogWrite(pwm_a, 100);
       digitalWrite(dir_b, HIGH);
-      analogWrite(pwm_b, 200);
-      Serial.println(line_position);
-      Serial.println("Turning Left");
+      analogWrite(pwm_b, 100);
+      // Serial.println(line_position);
+      //  Serial.println("Turning Left");
       break;
 
     // Line had moved off the left edge of sensor
@@ -209,18 +234,20 @@ void follow_line(int line_position) //follow the line
 
     case 0:
       digitalWrite(dir_a, LOW);
-      analogWrite(pwm_a, 200);
+      analogWrite(pwm_a, 100);
       digitalWrite(dir_b, LOW);
-      analogWrite(pwm_b, 200);
+      analogWrite(pwm_b, 100);
 
-      Serial.println(line_position);
-      Serial.println("Turning Right");
+      //   Serial.println(line_position);
+      //  Serial.println("Turning Right");
       break;
 
     // The line is still within the sensors.
     // This will calculate adjusting speed to keep the line in center.
     default:
-      error = (float)line_position - 1000; // 3500 is center measure of 7000 far left and 0 on far right
+      previousError = error;
+      error = (float)line_position - 1000; // 1000 is center measure of 2000 far left and 0 on far right
+
 
       // This sets the motor speed based on a proportional only formula.
       // kp is the floating-point proportional constant you need to tune.
@@ -230,7 +257,8 @@ void follow_line(int line_position) //follow the line
 
       // calculate the new Process Variable
       // this is the value that will be used to alter the speeds
-      PV = kp * error;
+      PV = (kp * error) + (kd * (error - previousError));
+      //PV = kp * error;
 
       // this section limits the PV (motor speed pwm value)
       // limit PV to 55
@@ -246,17 +274,32 @@ void follow_line(int line_position) //follow the line
 
       // adjust motor speeds to correct the path
       // Note that if PV > 0 the robot needs to turn left
-      m1Speed = 200 - PV;
-      m2Speed = 200 + PV;
+
+      m1Speed = 100 - PV;
+      m2Speed = 100 + PV;
 
       //set motor speeds
+
+      if (m1Speed > 100) {
+        m1Speed = 100;
+      }
+      if (m2Speed > 100) {
+        m2Speed = 100;
+      }
       digitalWrite(dir_a, HIGH);
       analogWrite(pwm_a, m1Speed);
       digitalWrite(dir_b, LOW);
       analogWrite(pwm_b, m2Speed);
 
-      Serial.println("Going straight");
-      Serial.println(line_position);
+      //Serial.println("Going straight");
+      Serial.print("Process Variable: ");
+      Serial.print(PV);
+      Serial.print(" Line position: ");
+      Serial.print(error);
+      Serial.print(" Motor 1: ");
+      Serial.print(m1Speed);
+      Serial.print(" Motor 2: ");
+      Serial.println(m2Speed);
       break;
   }
 
@@ -264,33 +307,150 @@ void follow_line(int line_position) //follow the line
 
 void readWideSensors()
 {
-
-  int leftSensorWhiteValue;
-  int rightSensorWhiteValue;
-
   leftSensor = analogRead(A4);
   rightSensor = analogRead(A0);
 
-  leftSensorWhiteValue += leftSensor;
-  rightSensorWhiteValue += rightSensor;
+  leftSensor = ((double)leftSensor / 1024) * 100.0;
+  rightSensor = ((double)rightSensor / 1024) * 100.0;
+  detectTile(leftSensor, rightSensor);
+}
 
-  leftSensorWhiteValue = leftSensorWhiteValue / 10;
-  rightSensorWhiteValue = rightSensorWhiteValue / 10;
+void detectTile(int left, int right)
+{
 
-  Serial.print("Left Sensor Value = ");
-  Serial.println(leftSensor);
+  if (left > blackThreshold)
+  {
+    if (right > blackThreshold)
+    { //bb
+      readTile(3, 5);
+      // printf("Black Black \n");
 
-  Serial.print("Left Sensor White Value = ");
-  Serial.println(leftSensorWhiteValue);
+    }
+    else
+    { //bw
+      readTile(1, 4);
+      line_position = 0;
+      //  printf("Black White \n");
+    }
+  }
+  else
 
-  Serial.print("Right Sensor Value = ");
-  Serial.println(rightSensor);
-
-  Serial.print("Right Sensor White Value = ");
-  Serial.println(rightSensorWhiteValue);
-
+  { //wb
+    if (right > blackThreshold)
+    {
+      // line_position = 2000;
+      readTile(0, 0);
+      //     printf("White Black \n");
+    } else
+    {
+      readTile(0, 0);
+      //   printf("White White \n");
+    }
+  }
+  //    detectEnd();
 
 }
+
+
+
+void readTile(int type, int caseId)
+{
+  int arrivalDirection = -1;
+
+  switch (caseId)
+  {
+    case 0: // Arrived from right side of the corner.
+      if (logging)
+      {
+        sendLogMessage(0);
+      }
+      //  arrivalDirection = orientation + 1;
+      //addTile(1, orientation + 1, xPosition, yPosition, orientation);
+      // moveWideLeft();
+      break;
+    case 1: // Arrived from left side of the corner.
+      if (logging)
+      {
+        sendLogMessage(1);
+      }
+      // arrivalDirection = orientation;
+      // moveWideRight();
+      //addTile(1, orientation, xPosition, yPosition, orientation);
+      break;
+
+    case 2: // Arrived from bottom side of a T tile.
+      if (logging)
+      {
+        sendLogMessage(2);
+      }
+      //  moveWideLeft();
+      //addTile(2, orientation + 1, xPosition, yPosition, orientation);
+      // arrivalDirection = orientation + 1;
+      break;
+
+    case 3: // Arrived from left side of the T.
+      if (logging)
+      {
+        sendLogMessage(3);
+      }
+      //addTile(2, orientation, xPosition, yPosition, orientation);
+      //  arrivalDirection = orientation;
+      //  moveWideRight();
+      break;
+
+    case 4: // Arrived from right side of the T.
+      if (logging)
+      {
+        sendLogMessage(4);
+      }
+      //addTile(2, orientation + 2, xPosition, yPosition, orientation);
+      //  arrivalDirection = orientation + 2;
+      //  moveWideLeft();
+      break;
+
+    case 5: // Arrived at an intersection.
+      if (logging)
+      {
+        sendLogMessage(5);
+      }
+      //addTile(3, 0, xPosition, yPosition, orientation);
+      // arrivalDirection = 0;
+      //  moveWideLeft();
+      break;
+
+    case 6:
+      if (logging)
+      {
+        sendLogMessage(8);
+      }
+
+      //  moveStraight();
+      break;
+  }
+
+
+
+  //makeMove();
+}
+
+int lastMessageId = -1;
+
+void sendLogMessage(int messageId) {
+
+  if (messageId != lastMessageId) {
+    myRadio.stopListening();
+    unsigned long id = messageId;
+    bool ok = myRadio.write(&id, sizeof(unsigned long));
+    if (ok) {
+      printf("Message Send:  %d \n", messageId);
+    } else {
+      printf("Failed to send... \n");
+    }
+    lastMessageId = messageId;
+  }
+  myRadio.startListening();
+}
+
 
 
 

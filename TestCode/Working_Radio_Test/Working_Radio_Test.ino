@@ -69,7 +69,7 @@ void setup(void)
   // Print preamble
   //
 
-  Serial.begin(57600);
+  Serial.begin(9600);
   printf_begin();
   printf("\n\rRF24/examples/GettingStarted/\n\r");
   printf("ROLE: %s\n\r",role_friendly_name[role]);
@@ -133,12 +133,12 @@ void loop(void)
     radio.stopListening();
 
     Package package = {24, 4, 200, 100, 2, 25};
-    unsigned long id = package.id;
+    unsigned long id = 3;
 
     // Take the time, and send it.  This will block until complete
     //unsigned long time = 666; 
     printf("Now sending Tile id %lu...", id);
-    bool ok = radio.write( &package, sizeof(package) );
+    bool ok = radio.write( &id, sizeof(unsigned long) );
     
     if (ok)
       printf("ok...");
