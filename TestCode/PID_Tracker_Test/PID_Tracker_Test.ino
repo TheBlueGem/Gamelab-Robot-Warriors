@@ -37,7 +37,7 @@
 #define leftBaseSpeed 100 
 
 //line sensor defines
-#define NUM_SENSORS   3    // number of sensors used
+#define NUM_SENSORS   4    // number of sensors used
 #define NUM_SAMPLES_PER_SENSOR  4  // average 4 analog samples per sensor reading
 #define TIMEOUT       2500  // waits for 2500 microseconds for sensor outputs to go low
 #define EMITTER_PIN   QTR_NO_EMITTER_PIN  // emitter control pin not used.  If added, replace QTR_NO_EMITTER_PIN with pin#
@@ -46,7 +46,7 @@
 // sensors 0 through 7 are connected to digital pins 2 through 10, respectively (pin 3 is skipped and used by the Ardumoto controller)
 // 0 is far Right sensor while 7 is far Left sensor
 QTRSensorsAnalog qtrrc((unsigned char[]) {
-  1, 2, 3
+  1, 2, 3, 4
 }, NUM_SENSORS  );
 unsigned int sensorValues[NUM_SENSORS]; // array with individual sensor reading values
 unsigned int line_position = 0; // value from 0-7000 to indicate position of line between sensor 0 - 7
@@ -76,16 +76,16 @@ int dir_a = 4;  //direction control for Ardumoto outputs A1 and A2 is on digital
 int dir_b = 7;  //direction control for Ardumoto outputs B3 and B4 is on digital pin 13  (Right motor)
 
 // motor tuning vars
-int calSpeed = 255;   // tune value motors will run while auto calibration sweeping turn over line (0-255)
+int calSpeed = 145;   // tune value motors will run while auto calibration sweeping turn over line (0-255)
 
 // Proportional Control loop vars
 float error = 0;
 float previousError = 0;
 float totalError = 0;
 float PV = 0 ; // Process Variable value calculated to adjust speeds and keep on line
-float kp = 0.4;  // This is the Proportional value. Tune this value to affect follow_line performance
-float kd = 0.2;
-float ki = 0.5;
+float kp = 0.1;  // This is the Proportional value. Tune this value to affect follow_line performance
+float kd = 0.05;
+float ki = 0.18;
 int m1Speed = 0; // (Left motor)
 int m2Speed = 0; // (Right motor)
 
@@ -123,21 +123,23 @@ void setup()
 
     // auto calibration sweeping left/right, tune 'calSpeed' motor speed at declaration
     // just high enough all sensors are passed over the line. Not too fast.
-    /* if (i == 0 || i == 60) // slow sweeping turn right to pass sensors over line
+     if (i == 0 || i == 65) // slow sweeping turn right to pass sensors over line
       {
        digitalWrite(dir_a, LOW);
        analogWrite(pwm_a, calSpeed);
        digitalWrite(dir_b, LOW);
        analogWrite(pwm_b, calSpeed);
+       printf("Right ");
       }
 
-      else if (i == 20 || i == 100) // slow sweeping turn left to pass sensors over line
+      else if (i == 25 || i == 85) // slow sweeping turn left to pass sensors over line
       {
        digitalWrite(dir_a, HIGH);
        analogWrite(pwm_a, calSpeed);
        digitalWrite(dir_b, HIGH);
        analogWrite(pwm_b, calSpeed);
-    */
+       printf("Left ");
+      }
 
     qtrrc.calibrate(); // reads all sensors with the define set 2500 microseconds (25 milliseconds) for sensor outputs to go low.
     //printf("Left sensor value: %d Mid sensor value: %d Right sensor value %d \n", sensorValues[0], sensorValues[1], sensorValues[2]);
@@ -149,14 +151,14 @@ void setup()
   Serial.println(line_position);
   // read the value of only a single sensor to see the line.
   // when the value is greater than 200 the sensor sees the line.
-  while (sensorValues[2] < 200)  // wait for line position to near center
+  while (sensorValues[3] < 200)  // wait for line position to near center
   {
     line_position = qtrrc.readLine(sensorValues);
     Serial.println(line_position);
   }
 
   // find near center
-  while (line_position > 1125) // continue loop until line position is near center
+  while (line_position > 1650) // continue loop until line position is near center
   {
     line_position = qtrrc.readLine(sensorValues);
     Serial.println(line_position);
@@ -215,7 +217,7 @@ void loop() // main loop
 
 void follow_line(int line_position) //follow the line
 {  
-  int error = line_position - 1000;
+  int error = line_position - 1500;
 
   int motorSpeed = kp * error + kd * (error - lastError) + ki * totalError;
   lastError = error;
