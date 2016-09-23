@@ -36,6 +36,7 @@ void setup()
   printf_begin();
   myRadio.begin();
   myRadio.openReadingPipe(1, pipes[1]);
+  myRadio.stopListening();
   myRadio.startListening();
   Serial.println("setup ");
 }
@@ -217,7 +218,7 @@ void loop(void) {
       Serial.println(expectedId);
  */
       // Now, resume listening so we catch the next packets.
-      myRadio.startListening();
+      //myRadio.startListening();
    
 
   }

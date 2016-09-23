@@ -8,7 +8,7 @@
 #define rightBaseSpeed 100 // this is the speed at which the motors should spin when the robot is perfectly on the line
 #define leftBaseSpeed 100 
 
-#define NUM_SENSORS   4    // number of sensors used
+#define NUM_SENSORS   4  // number of sensors used
 #define NUM_SAMPLES_PER_SENSOR  4  // average 4 analog samples per sensor reading
 #define TIMEOUT       2500  // waits for 2500 microseconds for sensor outputs to go low
 #define EMITTER_PIN   QTR_NO_EMITTER_PIN  // emitter control pin not used.  If added, replace QTR_NO_EMITTER_PIN with pin#
@@ -16,10 +16,10 @@
 QTRSensorsAnalog qtrrc((unsigned char[]) { 1, 2, 3, 4
 }, NUM_SENSORS  );
 unsigned int sensorValues[NUM_SENSORS]; // array with individual sensor reading values
-unsigned int line_position = 0; // value from 0-7000 to indicate position of line between sensor 0 - 7
+unsigned int line_position = 0; // value from 0-3000 to indicate position of line between sensor 0 - 5
 
 // motor tuning vars
-int calSpeed = 145;   // tune value motors will run while auto calibration sweeping turn over line (0-255)
+int calSpeed = 145;   // tune value motors will run while auto calibration sweeping turn over line
 
 // Proportional Control loop vars
 float error = 0;
@@ -31,18 +31,9 @@ float kd = 0.05; // This is the Derivative value. It is used to keep the robot f
                 // A higher derivative value will make the robot countersteer earlier.
 float ki = 0.18; // This is the Integral value. It is used to reduce the systematic errors over time. This way the robot will attempt to overshoot 
                 // the line less the longer he's active. A higher integral value will stabilize the robot faster.
-int m1Speed = 0; // (Left motor)
-int m2Speed = 0; // (Right motor)
-
 
 // digital pins used: 2 = rf; 4,5,6,7 = motorshield; 3,11,12,13 = radio
-// analog pins used: 0 = sensor 1; 1 = sensor 2; 2 = sensor 3; 3 = sensor 4; 4 = sensor 5;
-
-Tile* tiles[50];
-int robotOrientation[50];
-
-int amountOfTiles = 0;
-int amountOfPackages = 0;
+// six analog sensor connected to the analog pins
 
 RF24 myRadio(9, 10);
 
@@ -64,15 +55,8 @@ typedef struct package Package;
 int orientation = 0; // 0 = north, 1 = east, 2 = south, 3 = west
 int xPosition = 0;
 int yPosition = 0;
-
-//int followLineDifference = 3;
-int blackThreshold = 60;
-
-int leftSensorWhiteValue;
-int rightSensorWhiteValue;
+int blackThreshold = 60; //Percentile value of when a sensor is considered seeing black
 boolean logging = true;
-
-int junction = 0; //followLine = 0, left = 1, straight = 2, right = 3, reverse = 4
 
 // pwm_a/b sets speed.  Value range is 0-255.  For example, if you set the speed at 100 then 100/255 = 39% duty cycle = slow
 // dir_a/b sets direction.  LOW is Forward, HIGH is Reverse
@@ -81,12 +65,8 @@ int pwm_b = 6;  //PWM control for Ardumoto outputs B3 and B4 is on digital pin 1
 int dir_a = 4;  //direction control for Ardumoto outputs A1 and A2 is on digital pin 12  (Left motor)
 int dir_b = 7;  //direction control for Ardumoto outputs B3 and B4 is on digital pin 13  (Right motor)
 
-
 void setup()
 {
-  for (int i = 4; i <= 7; i++) //For Arduino Motor Shield
-    pinMode(i, OUTPUT);  //set pin 4,5,6,7 to output mode
-
   Serial.begin(9600);
   printf_begin();
 
@@ -100,12 +80,11 @@ void setup()
   myRadio.openReadingPipe(1, pipes[0]);
   myRadio.startListening();                 // Switch to reading pipe
 
-
   // delay to allow you to set the robot on the line, turn on the power,
   // then move your hand away before it begins moving.
   delay(2000);
 
-   // calibrate line sensor; determines min/max range of sensed values for the current course
+  // calibrate line sensor; determines min/max range of sensed values for the current course
   for (int i = 0; i <= 100; i++)  // begin calibration cycle to last about 2.5 seconds (100*25ms/call)
   {
     // auto calibration sweeping left/right, tune 'calSpeed' motor speed at declaration
@@ -126,8 +105,7 @@ void setup()
        analogWrite(pwm_b, calSpeed);
     */
 
-    qtrrc.calibrate(); // reads all sensors with the define set 2500 microseconds (25 milliseconds) for sensor outputs to go low.
-    //printf("Left sensor value: %d Mid sensor value: %d Right sensor value %d \n", sensorValues[0], sensorValues[1], sensorValues[2]);
+    qtrrc.calibrate(); // reads all sensors with the define set 2500 microseconds (25 milliseconds) for sensor outputs to go low.    
   }  // end calibration cycle
 
   line_position = qtrrc.readLine(sensorValues);
@@ -140,7 +118,7 @@ void setup()
   }
 
   // stop both motors
-  analogWrite(pwm_b, 0); // stop right motor first which kinda helps avoid over run
+  analogWrite(pwm_b, 0);
   analogWrite(pwm_a, 0);
 
   // delay as indicator setup and calibration is complete
@@ -150,7 +128,7 @@ void setup()
 }
 
 int readSensor(int sensor)
-{ //returns a percentage of how black the sensor is. 0 = white; 100 = black.
+{ //returns a percentile value indicating how much light the sensor is receiving. 0 = fully lit; 100 = completely dark.
   double result;
   int detectedValue;
   int range = 1024;
@@ -193,37 +171,21 @@ void setNewLocation()
 
 void moveStraight()
 { 
-    // Motor1(255, false);
-     //  Motor2(255, true);
-}
-
-void moveLeft()
-{
-  
-    //   Motor1(255, true);
-     //  Motor2(255, true);
-    //sendLogMessage(9);  
+    follow_line(line_position);
 }
 
 void moveWideLeft()
 { 
-    //   Motor1(0, true);
-    //   Motor2(255, true);
-    //sendLogMessage(11); 
-}
-
-void moveRight()
-{ 
-    //   Motor1(255, false);
-    //   Motor2(255, false);
-    //sendLogMessage(10);
+   analogWrite(pwm_a, 0);
+   analogWrite(pwm_b, 150);
+    //sendLogMessage(11);   
 }
 
 void moveWideRight()
 {
-    //   Motor1(255, false);
-    //   Motor2(0, false);
-   // sendLogMessage(12); 
+   analogWrite(pwm_a, 150);
+   analogWrite(pwm_b, 0);
+   // sendLogMessage(12);    
 }
 
 void turnOff()
@@ -237,75 +199,25 @@ void turnOff()
 
 }
 
-/*void addTile(int tileType, int tileOrientation, int x, int y, int robotOrientation)
-{
-  Tile* newTile = new Tile(tileType, tileOrientation, x, y);
-  //sendMessage(newTile->getType(), newTile->getOrientation(), x, y, orientation);
-  boolean tileKnown = false;
-  for(int i = 0; i < amountOfTiles; i++)
-  {
-  if(x == tiles[i]->getXCoordinate() && y == tiles[i]->getYCoordinate())
-  { //check if there is a tile on x and y coordinates.
-    newTile = tiles[i];
-    tileKnown = true;
-  }
-  }
-  if(!tileKnown)
-  {
-  for(int i = 0; i < amountOfTiles; i++)
-  {
-    Tile* checkingTile = tiles[i];
-    int x2 = checkingTile->getXCoordinate();
-    int y2 = checkingTile->getYCoordinate();
-    if(x == x2 && y + 1 == y2)
-    { //CheckingTile is north of newTile
-    newTile->setNorth(checkingTile);
-    checkingTile->setSouth(newTile);
-    }
-    if(x + 1 == x2 && y == y2)
-    { //CheckingTile is east of newTile
-    newTile->setEast(checkingTile);
-    checkingTile->setWest(newTile);
-    }
-    if(x == x2 && y - 1 == y2)
-    { //CheckingTile is south of newTile
-    newTile->setSouth(checkingTile);
-    checkingTile->setNorth(newTile);
-    }
-    if(x - 1 == x2 && y == y2)
-    { //CheckingTile is west of newTile
-    newTile->setWest(checkingTile);
-    checkingTile->setEast(newTile);
-    }
-  }
 
-  bool north = checkDirectionPossibility(tileType, tileOrientation, 0);
-  bool east = checkDirectionPossibility(tileType, tileOrientation, 1);
-  bool south = checkDirectionPossibility(tileType, tileOrientation, 2);
-  bool west = checkDirectionPossibility(tileType, tileOrientation, 3);
-
-  newTile->setOptionNorth(north);
-  newTile->setOptionSouth(south);
-  newTile->setOptionEast(east);
-  newTile->setOptionWest(west);
-
-  //sendMessage(packageId, x, y, (String) ammountOfTiles);
-  }
-
-  //tiles[amountOfTiles] = newTile;
-  //robotOrientation[amountOfTiles] = rOrientation;
-  //amountOfTiles++;
-}*/
+int counter = 0;
 
 void detectTile()
 {
   int left = readSensor(5);
   int right = readSensor(0);
 
-  printf("Left Value: %d", left);;
+if(counter >= 100){
+  printf("Left Value: %d", left);
   printf(" Right Value: %d\n", right);
   printf("Line Position: %d\n", line_position);
-
+  counter = 0;
+  }
+  else
+  {
+    counter++;
+  }
+  
   if(left > blackThreshold)
     {
     if(line_position > 1000 && line_position < 2000)
@@ -375,6 +287,7 @@ void readTile(int type, int caseId)
     arrivalDirection = orientation + 1;
     //addTile(1, orientation + 1, xPosition, yPosition, orientation);
     moveWideLeft();
+    
     break;
   case 1: // Arrived from the right side of a T-tile.
     if (logging)
@@ -549,446 +462,11 @@ void receiveMessage()
       //addTile(data.tile, data.tileOrientation, data.xPosition, data.yPosition, data.robotOrientation);
     }
   }
-
 }
-
-//make a choice based on the orientation of the robot, tile type and tile orientation. Always try to go right, if not go straight, if not go left or turn around.
-void makeMove()
-{
-  //get current tile
-  Tile* currentTile;
-  for (int i = 0; i < amountOfTiles; i++)
-  {
-    if (xPosition == tiles[i]->getXCoordinate() && yPosition == tiles[i]->getYCoordinate()) //check if there is a tile on the current x and y coordinates.
-    {
-      currentTile = tiles[i];
-    }
-  }
-
-  //check if robot has been on this tile with the same orientation
-  bool sameOrientationAndTile = false;
-  for (int j = 0; j < amountOfTiles; j++)
-  {
-    Tile* t = tiles[j];
-    int robotOrientationOnTile = robotOrientation[j];
-    //    TilePackage tp = tilePackages[j];
-    if (t->getXCoordinate() == currentTile->getXCoordinate() && t->getYCoordinate() == currentTile->getYCoordinate() && robotOrientationOnTile == orientation)
-    {
-      sameOrientationAndTile = true;
-    }
-  }
-
-  switch (orientation)
-  {
-  case 0: //orientation = North
-    if (sameOrientationAndTile)
-    {
-      if (currentTile->getOptionEast())
-      {
-        junction = 3;
-      }
-      else if (currentTile->getOptionNorth())
-      {
-        junction = 2;
-      }
-      else if (currentTile->getOptionWest())
-      {
-        junction = 1;
-      }
-      else
-      {
-        junction = 4;
-      }
-    }
-    else
-    {
-      if (currentTile->getOptionEast())
-      {
-        if (currentTile->getOptionNorth())
-        {
-          junction = 2;
-        }
-        else if (currentTile->getOptionWest())
-        {
-          junction = 1;
-        }
-        else
-        {
-          junction = 3;
-        }
-      }
-      else if (currentTile->getOptionNorth())
-      {
-        if (currentTile->getOptionWest())
-        {
-          junction = 1;
-        }
-        else
-        {
-          junction = 2;
-        }
-      }
-      else if (currentTile->getOptionWest())
-      {
-        junction = 1;
-      }
-      else
-      {
-        junction = 4;
-      }
-    }
-    /*else if(sameOrientationAndTile == 2)
-    {
-    if(currentTile->getOptionEast())
-    {
-    if(currentTile->getOptionNorth())
-    {
-    if(currentTile->getOptionWest())
-    {
-    junction = 1;
-    }
-    else
-    {
-    junction = 3;
-    }
-    }
-    else
-    {
-    junction = 3;
-    }
-    }
-    else if(currentTile->getOptionNorth())
-    {
-    junction = 2;
-    }
-    else if(currentTile->getOptionWest())
-    {
-    junction = 1;
-    }
-    else
-    {
-    junction = 4;
-    }
-    }*/
-    break;
-  case 1: //orientation = East
-    if (sameOrientationAndTile)
-    {
-      if (currentTile->getOptionSouth())
-      {
-        junction = 3;
-      }
-      else if (currentTile->getOptionEast())
-      {
-        junction = 2;
-      }
-      else if (currentTile->getOptionNorth())
-      {
-        junction = 1;
-      }
-      else
-      {
-        junction = 4;
-      }
-    }
-    else
-    {
-      if (currentTile->getOptionSouth())
-      {
-        if (currentTile->getOptionEast())
-        {
-          junction = 2;
-        }
-        else if (currentTile->getOptionNorth())
-        {
-          junction = 1;
-        }
-        else
-        {
-          junction = 3;
-        }
-      }
-      else if (currentTile->getOptionEast())
-      {
-        if (currentTile->getOptionNorth())
-        {
-          junction = 1;
-        }
-        else
-        {
-          junction = 2;
-        }
-      }
-      else if (currentTile->getOptionNorth())
-      {
-        junction = 1;
-      }
-      else
-      {
-        junction = 4;
-      }
-    }
-    /*else if(sameOrientationAndTile == 2)
-    {
-    if(currentTile->getOptionSouth())
-    {
-    if(currentTile->getOptionEast())
-    {
-    if(currentTile->getOptionNorth())
-    {
-    junction = 1;
-    }
-    else
-    {
-    junction = 3;
-    }
-    }
-    else
-    {
-    junction = 3;
-    }
-    }
-    else if(currentTile->getOptionEast())
-    {
-    junction = 2;
-    }
-    else if(currentTile->getOptionNorth())
-    {
-    junction = 1;
-    }
-    else
-    {
-    junction = 4;
-    }
-    }*/
-    break;
-  case 2:
-    if (sameOrientationAndTile)
-    {
-      if (currentTile->getOptionWest())
-      {
-        junction = 3;
-      }
-      else if (currentTile->getOptionSouth())
-      {
-        junction = 2;
-      }
-      else if (currentTile->getOptionEast())
-      {
-        junction = 1;
-      }
-      else
-      {
-        junction = 4;
-      }
-    }
-    else
-    {
-      if (currentTile->getOptionWest())
-      {
-        if (currentTile->getOptionSouth())
-        {
-          junction = 2;
-        }
-        else if (currentTile->getOptionEast())
-        {
-          junction = 1;
-        }
-        else
-        {
-          junction = 3;
-        }
-      }
-      /*else if(currentTile->getOptionSouth())
-      {
-      if(currentTile->getOptionEast())
-      {
-      junction = 1;
-      }
-      else
-      {
-      junction = 2;
-      }
-      }
-      else if(currentTile->getOptionEast())
-      {
-      junction = 1;
-      }
-      else
-      {
-      junction = 4;
-      }
-      }
-      else if(sameOrientationAndTile == 2)
-      {
-      if(currentTile->getOptionWest())
-      {
-      if(currentTile->getOptionSouth())
-      {
-      if(currentTile->getOptionEast())
-      {
-      junction = 1;
-      }
-      else
-      {
-      junction = 3;
-      }
-      }
-      else
-      {
-      junction = 3;
-      }
-      }
-      else if(currentTile->getOptionSouth())
-      {
-      junction = 2;
-      }
-      else if(currentTile->getOptionEast())
-      {
-      junction = 1;
-      }
-      else
-      {
-      junction = 4;
-      }
-      }*/
-      break;
-  case 3:
-    if (sameOrientationAndTile)
-    {
-      if (currentTile->getOptionNorth())
-      {
-        junction = 3;
-      }
-      else if (currentTile->getOptionWest())
-      {
-        junction = 2;
-      }
-      else if (currentTile->getOptionSouth())
-      {
-        junction = 1;
-      }
-      else
-      {
-        junction = 4;
-      }
-    }
-    else
-    {
-      if (currentTile->getOptionNorth())
-      {
-        if (currentTile->getOptionWest())
-        {
-          junction = 2;
-        }
-        else if (currentTile->getOptionSouth())
-        {
-          junction = 1;
-        }
-        else
-        {
-          junction = 3;
-        }
-      }
-      else if (currentTile->getOptionWest())
-      {
-        if (currentTile->getOptionSouth())
-        {
-          junction = 1;
-        }
-        else
-        {
-          junction = 2;
-        }
-      }
-      else if (currentTile->getOptionSouth())
-      {
-        junction = 1;
-      }
-      else
-      {
-        junction = 4;
-      }
-    }
-    /*else if(sameOrientationAndTile == 2)
-    {
-    if(currentTile->getOptionNorth())
-    {
-    if(currentTile->getOptionWest())
-    {
-    if(currentTile->getOptionSouth())
-    {
-    junction = 1;
-    }
-    else
-    {
-    junction = 3;
-    }
-    }
-    else
-    {
-    junction = 3;
-    }
-    }
-    else if(currentTile->getOptionWest())
-    {
-    junction = 2;
-    }
-    else if(currentTile->getOptionSouth())
-    {
-    junction = 1;
-    }
-    else
-    {
-    junction = 4;
-    }
-    }*/
-    break;
-    }
-  }
-}
-
-//check for possible direction based on the type of tile, orientation of the tile and the orientation of the robot.
-/*boolean checkDirectionPossibility(int tileType, int tileOrientation, int moveDirection)
-{
-  if(tileOrientation > 3)
-  {
-  tileOrientation = tileOrientation - 4;
-  }
-  switch(moveDirection)
-  {
-  case 0: //north
-  if((tileType == 0 && tileOrientation == 2) || (tileType == 2 && tileOrientation != 1) || (tileType == 1 && (tileOrientation != 0 && tileOrientation != 1)) || tileType == 3)
-  {
-    return true;
-  }
-  break;
-  case 1: //east
-  if((tileType == 0 && tileOrientation == 3) || (tileType == 2 && tileOrientation != 2) || (tileType == 1 && (tileOrientation != 1 && tileOrientation != 2)) || tileType == 3)
-  {
-    return true;
-  }
-  break;
-  case 2: //south
-  if((tileType == 0 && tileOrientation == 0) || (tileType == 2 && tileOrientation != 3) || (tileType == 1 && (tileOrientation != 2 && tileOrientation != 3)) || tileType == 3)
-  {
-    return true;
-  }
-  break;
-  case 3: //west
-  if((tileType == 0 && tileOrientation == 1) || (tileType == 2 && tileOrientation != 0) || (tileType == 1 && (tileOrientation != 0 && tileOrientation != 3)) || tileType == 3)
-  {
-    return true;
-  }
-  break;
-  }
-  return false;
-}*/
 
 void follow_line(int line_position) //follow the line
 {  
   int error = line_position - 1500;
-
   int motorSpeed = kp * error + kd * (error - previousError) + ki * totalError;
   previousError = error;
 
@@ -1000,22 +478,15 @@ void follow_line(int line_position) //follow the line
   if (rightMotorSpeed < 0) rightMotorSpeed = 0; // keep the motor speed positive
   if (leftMotorSpeed < 0) leftMotorSpeed = 0; // keep the motor speed positive
 
-
-      digitalWrite(dir_a, HIGH);
-      analogWrite(pwm_a, rightMotorSpeed);
-      digitalWrite(dir_b, LOW);
-      analogWrite(pwm_b, leftMotorSpeed);
-
-      //Serial.println("Going straight");
-       
-     
+  digitalWrite(dir_a, HIGH);
+  analogWrite(pwm_a, rightMotorSpeed);
+  digitalWrite(dir_b, LOW);
+  analogWrite(pwm_b, leftMotorSpeed);   
 } // end follow_line
 
 void loop()
 { 
-  //printf("Values left: %d middle: %d right: %d\n", left, middle, right);
    line_position = qtrrc.readLine(sensorValues);
-   
    detectTile();
 }
 
