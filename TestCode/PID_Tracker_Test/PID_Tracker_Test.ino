@@ -34,6 +34,7 @@ RF24 myRadio(9, 10);
 const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL }; // Radio pipe addresses for the 2 nodes to communicate.
 
 bool onLine = true;
+bool opdelijn;
 
 float power = 0 ; // Process Variable value calculated to adjust speeds and keep on line
 float kp = 80;  // This is the Proportional value. Tune this value to affect follow_line performance
@@ -62,6 +63,10 @@ void setup()
 
 void loop()
 {
+  if (readSensor(3) || readSensor(1) || readSensor(2) || readSensor(4) )
+  {
+    opdelijn = true;
+  }
   if (readWideSensor(0)) {
     lastWideSensor = 0;
   }
@@ -78,17 +83,20 @@ void loop()
     followLine();
   }
   else {
-    turn();
-
+    checkDirections();
   }
 }  // end main loop
 
 bool checkWideSensors() {
 
-
-  if (readSensor(3) || readSensor(1) || readSensor(2) || readSensor(4) )
+  if (opdelijn)
   {
-    return true;
+    if (!readWideSensor(0) && !readWideSensor(5))
+    {
+      return true;
+    }else{
+      return false;
+    }
   }
   else if (readWideSensor(0))  {
     return false;
@@ -99,6 +107,43 @@ bool checkWideSensors() {
   else {
     return false;
   }
+}
+
+void checkDirections() {
+
+  if (readWideSensor(0))  {
+    if (readWideSensor(5)) {
+      if (opdelijn) {
+      // kan alle kanten op.
+      turnRight();
+      delay(500);
+      }
+      // kan allee links of rechts kanten op.
+      else {
+        turnLeft();
+      }
+    } else {
+      // kan alleen rechts.
+      turn();
+    }
+  } else if (readWideSensor(5)) {
+    // kan alleen links.
+    turn();
+  }
+}
+void turnLeft() {
+  digitalWrite(dir_a, HIGH);
+  digitalWrite(dir_b, HIGH);
+  analogWrite(pwm_a, maxMotorSpeed);
+  analogWrite(pwm_b, maxMotorSpeed);
+}
+
+
+void turnRight() {
+  digitalWrite(dir_a, LOW);
+  digitalWrite(dir_b, LOW);
+  analogWrite(pwm_a, maxMotorSpeed);
+  analogWrite(pwm_b, maxMotorSpeed);
 }
 
 void turn()
