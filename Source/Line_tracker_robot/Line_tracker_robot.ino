@@ -392,28 +392,7 @@ void detectEnd()
 
 int lastMessageId = -1;
 
-void logString(int messageId, String message)
-{
-  if (messageId != lastMessageId) {
-    Serial.println(message);
-    lastMessageId = messageId;
-  }
-}
 
-int currentPackageId = 0;
-
-void sendLogMessage(int messageId) {
-  if (messageId != lastMessageId) {
-    myRadio.stopListening();
-    unsigned long id = messageId;
-    bool ok = myRadio.write(&id, sizeof(unsigned long));
-    if (ok) {
-      printf("Message Send:  %d \n", messageId);
-    }
-    lastMessageId = messageId;
-  }
-
-}
 void sendMessage(int tile, int tileOrientation, int x, int y, int robotOrientation)
 {
   //bool received = false;
