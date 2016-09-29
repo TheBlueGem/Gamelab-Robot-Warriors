@@ -38,7 +38,7 @@ void setup()
   myRadio.openReadingPipe(1, pipes[1]);
   myRadio.stopListening();
   myRadio.startListening();
-  Serial.println("setup ");
+  //Serial.println("setup ");
 }
 
 void addTile(int tileType, int tileOrientation, int x, int y, int rOrientation) {
@@ -128,13 +128,16 @@ void printMessage(unsigned long id) {
       Serial.println("Unrecognized log message");
       break;
     case 0: // arrive from right side of the corner.
-      Serial.println("Arrived from the right side of a corner...");
+      Serial.println("New Tile, Straight...");
+       delay(1000);
       break;
     case 1: // arrive from left side of the corner.
-      Serial.println("Arrived from the left side of a corner...");
+      Serial.println("New Tile, Right Corner...");
+       delay(1000);
       break;
     case 2: // arrive from bottom side of a T tile.
-      Serial.println("Arrived fron the bottom side of a T tile...");
+      Serial.println("New Tile, Left Corner...");
+       delay(1000);
       break;
     case 3: // arrive from left side of the T.
       Serial.println("Arrived fron the left side of a T tile...");
@@ -166,62 +169,72 @@ void printMessage(unsigned long id) {
     case 12:
       Serial.println("Moving right wide...");
       break;
+    case 14:
+      Serial.print("1");
+      Serial.print("2");
+      Serial.println("7");
+      delay(1000);
+
+      break;
   }
 
 }
 
 int expectedId = 1;
+int o = 1;
+bool newtilegelezen = false;
 unsigned long lastMessageId = -1;
 void loop(void) {
+
 
   //receiveMessage();
   if (myRadio.available()) {
     unsigned long id;
     myRadio.read(&id, sizeof(unsigned long));
 
-      printMessage(id);
-  
-    /* Package data1 = {1, 90, 70, 30};
-       Package data;
-       unsigned long time = 80;
-       if(!expectedId == data.id){
-         expectedId = data.id;
-       }
-       Serial.println("radio is beschickbaar ");
-       myRadio.read(&data, sizeof(Package));
-       if(data.id == expectedId)
-       {
-       char buf[16];
-       dtostrf(data.sensor1, 2, 0, buf);
-        char buf1[16];
-       dtostrf(data.sensor2, 2, 0, buf1);
-        char buf2[16];
-       dtostrf(data.sensor3, 2, 0, buf2);
-       // Serial.println(data.position);
-       printf("Sensor 1 %s \n\r", buf);
-       printf("Sensor 2 %s \n\r", buf1);
-       printf("Sensor 3 %s \n\r", buf2);
-       expectedId++;
-       }
-              // Serial.println(time);
-       delay(20);
-
-
-
-      // First, stop listening so we can talk
-      myRadio.stopListening();
-
-      // Send the final one back.
-      //  int sendback = expectedId + 1;
-      myRadio.write( &expectedId, sizeof(expectedId) );
-      Serial.println("sent shit");
-      Serial.println(expectedId);
- */
-      // Now, resume listening so we catch the next packets.
-      //myRadio.startListening();
-   
-
+    printMessage(id);
   }
+  /* Package data1 = {1, 90, 70, 30};
+     Package data;
+     unsigned long time = 80;
+     if(!expectedId == data.id){
+       expectedId = data.id;
+     }
+     Serial.println("radio is beschickbaar ");
+     myRadio.read(&data, sizeof(Package));
+     if(data.id == expectedId)
+     {
+     char buf[16];
+     dtostrf(data.sensor1, 2, 0, buf);
+      char buf1[16];
+     dtostrf(data.sensor2, 2, 0, buf1);
+      char buf2[16];
+     dtostrf(data.sensor3, 2, 0, buf2);
+     // Serial.println(data.position);
+     printf("Sensor 1 %s \n\r", buf);
+     printf("Sensor 2 %s \n\r", buf1);
+     printf("Sensor 3 %s \n\r", buf2);
+     expectedId++;
+     }
+            // Serial.println(time);
+     delay(20);
+
+
+
+    // First, stop listening so we can talk
+    myRadio.stopListening();
+
+    // Send the final one back.
+    //  int sendback = expectedId + 1;
+    myRadio.write( &expectedId, sizeof(expectedId) );
+    Serial.println("sent shit");
+    Serial.println(expectedId);
+  */
+  // Now, resume listening so we catch the next packets.
+  //myRadio.startListening();
+
+
+
 
   if ( Serial.available() )
   {

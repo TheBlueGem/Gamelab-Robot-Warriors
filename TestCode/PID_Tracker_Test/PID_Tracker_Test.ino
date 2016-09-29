@@ -21,6 +21,8 @@ int pwm_b = 6;
 int dir_a = 4;
 int dir_b = 7;
 
+int direction = 0; // 0 = straight, 1 = right corner, 2 = left corner.
+
 bool c = false;
 int lastWideSensor = 9;
 
@@ -63,10 +65,11 @@ void setup()
 
 void loop()
 {
-  if (readSensor(3) || readSensor(1) || readSensor(2) || readSensor(4) )
-  {
+  /*if (readSensor(3) || readSensor(1) || readSensor(2) || readSensor(4) )
+    {
     opdelijn = true;
-  }
+    }*/
+  checkForNewTile();
   if (readWideSensor(0)) {
     lastWideSensor = 0;
   }
@@ -80,24 +83,28 @@ void loop()
   {
     digitalWrite(dir_a, HIGH);
     digitalWrite(dir_b, LOW);
+    
     followLine();
   }
   else {
     checkDirections();
+    //turn();
   }
 }  // end main loop
 
 bool checkWideSensors() {
 
-  if (opdelijn)
+  if (readSensor(3) || readSensor(1) || readSensor(2) || readSensor(4))
   {
-    if (!readWideSensor(0) && !readWideSensor(5))
-    {
-      return true;
-    }else{
-      return false;
-    }
+    return true;
   }
+  /*if (!readWideSensor(0) && !readWideSensor(5))
+    {
+    return true;
+    }else{
+    return false;
+    }*/
+
   else if (readWideSensor(0))  {
     return false;
   }
@@ -109,27 +116,26 @@ bool checkWideSensors() {
   }
 }
 
+
 void checkDirections() {
 
   if (readWideSensor(0))  {
     if (readWideSensor(5)) {
-      if (opdelijn) {
-      // kan alle kanten op.
-      turnRight();
-      delay(500);
-      }
-      // kan allee links of rechts kanten op.
-      else {
-        turnLeft();
-      }
-    } else {
-      // kan alleen rechts.
-      turn();
-    }
-  } else if (readWideSensor(5)) {
-    // kan alleen links.
+      digitalWrite(dir_a, HIGH);
+      digitalWrite(dir_b, LOW);
+      
+      analogWrite(pwm_a, maxMotorSpeed);
+      analogWrite(pwm_b, maxMotorSpeed);
+  } else {
+    // kan alleen rechts.
+     direction = 2;
     turn();
   }
+} else if (readWideSensor(5)) {
+  // kan alleen links.
+   direction = 1;
+  turn();
+}
 }
 void turnLeft() {
   digitalWrite(dir_a, HIGH);
@@ -155,7 +161,7 @@ void turn()
     analogWrite(pwm_a, maxMotorSpeed);
     analogWrite(pwm_b, maxMotorSpeed);
     // delay(200);
-
+    
   }
   if (lastWideSensor == 5) {
     digitalWrite(dir_a, HIGH);
@@ -163,6 +169,7 @@ void turn()
     analogWrite(pwm_a, maxMotorSpeed);
     analogWrite(pwm_b, maxMotorSpeed);
     // delay(200);
+   
   }
 }
 
@@ -176,7 +183,16 @@ void followLine()
 
 } // end follow_line
 
-
+void checkForNewTile() {
+  if (!readSensor(1) && !readSensor(2) && !readSensor(3) && !readSensor(4))
+  {
+    if (readWideSensor(0) && readWideSensor(5)) {
+      sendLogMessage(direction);
+      direction = 0;
+     
+    }
+  }
+}
 void readLine() {
 
   for (int i = 0; i < 4; i++) {
@@ -304,11 +320,11 @@ void calcPID() {
   power = (kp * error) + (kd * (error - previousError)) + (ki * totalError);
 
 
-  Serial.print(previousError);
-  Serial.print(" ");
-  Serial.print(error);
-  Serial.print(" ");
-  Serial.println(power);
+  //Serial.print(previousError);
+  //Serial.print(" ");
+  // Serial.print(error);
+  // Serial.print(" ");
+  // Serial.println(power);
 
   if ( power > maxMotorSpeed) {
     power = maxMotorSpeed;
