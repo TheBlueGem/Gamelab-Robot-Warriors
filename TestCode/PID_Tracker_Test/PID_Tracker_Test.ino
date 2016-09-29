@@ -1,7 +1,6 @@
 #include "printf.h"
 #include "RF24.h"
 
-
 //line sensor defines
 int sensor[4] = { 1, 2, 3, 4 };
 int sensorReadings[4] = { 0 };
@@ -21,7 +20,7 @@ int pwm_b = 6;
 int dir_a = 4;
 int dir_b = 7;
 
-int direction = 0; // 0 = straight, 1 = right corner, 2 = left corner.
+int direction = 0; // 0 = Robot North, 1 = Robot East, 2 = Robot South, 3 = Robot West.
 
 bool c = false;
 int lastWideSensor = 9;
@@ -63,12 +62,10 @@ void setup()
   digitalWrite(dir_b, LOW);
 } // end setup
 
+int counter = 0;
+
 void loop()
 {
-  /*if (readSensor(3) || readSensor(1) || readSensor(2) || readSensor(4) )
-    {
-    opdelijn = true;
-    }*/
   checkForNewTile();
   if (readWideSensor(0)) {
     lastWideSensor = 0;
@@ -83,28 +80,21 @@ void loop()
   {
     digitalWrite(dir_a, HIGH);
     digitalWrite(dir_b, LOW);
-    
+
     followLine();
+    counter = 0;
   }
   else {
     checkDirections();
-    //turn();
+    turn();
   }
 }  // end main loop
 
 bool checkWideSensors() {
-
   if (readSensor(3) || readSensor(1) || readSensor(2) || readSensor(4))
   {
     return true;
   }
-  /*if (!readWideSensor(0) && !readWideSensor(5))
-    {
-    return true;
-    }else{
-    return false;
-    }*/
-
   else if (readWideSensor(0))  {
     return false;
   }
@@ -116,27 +106,17 @@ bool checkWideSensors() {
   }
 }
 
-
 void checkDirections() {
-
   if (readWideSensor(0))  {
     if (readWideSensor(5)) {
       digitalWrite(dir_a, HIGH);
       digitalWrite(dir_b, LOW);
-      
       analogWrite(pwm_a, maxMotorSpeed);
       analogWrite(pwm_b, maxMotorSpeed);
-  } else {
-    // kan alleen rechts.
-     direction = 2;
-    turn();
+    }
   }
-} else if (readWideSensor(5)) {
-  // kan alleen links.
-   direction = 1;
-  turn();
 }
-}
+
 void turnLeft() {
   digitalWrite(dir_a, HIGH);
   digitalWrite(dir_b, HIGH);
@@ -156,20 +136,34 @@ void turn()
 {
   if (lastWideSensor == 0)
   {
+    if (counter > 150) {
+      Serial.println("I can only go riiight");
+      sendLogMessage(-1);
+      direction++;
+      counter = 0;
+    }
+    counter++;
     digitalWrite(dir_a, LOW);
     digitalWrite(dir_b, LOW);
     analogWrite(pwm_a, maxMotorSpeed);
     analogWrite(pwm_b, maxMotorSpeed);
     // delay(200);
-    
+
   }
   if (lastWideSensor == 5) {
+    if (counter > 150) {
+      Serial.println("I can only go leeeeft");
+      sendLogMessage(-1);
+      direction--;
+      counter = 0;
+    }
+    counter++;
     digitalWrite(dir_a, HIGH);
     digitalWrite(dir_b, HIGH);
     analogWrite(pwm_a, maxMotorSpeed);
     analogWrite(pwm_b, maxMotorSpeed);
     // delay(200);
-   
+
   }
 }
 
@@ -180,7 +174,6 @@ void followLine()
   //Serial.println(rightMotorSpeed);
   analogWrite(pwm_a, leftMotorSpeed);
   analogWrite(pwm_b, rightMotorSpeed);
-
 } // end follow_line
 
 void checkForNewTile() {
@@ -188,8 +181,7 @@ void checkForNewTile() {
   {
     if (readWideSensor(0) && readWideSensor(5)) {
       sendLogMessage(direction);
-      direction = 0;
-     
+      
     }
   }
 }
