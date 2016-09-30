@@ -37,6 +37,11 @@ const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL }; // Radio pipe addr
 bool onLine = true;
 bool opdelijn;
 
+int checkCounter;
+bool check1;
+bool check2;
+bool check3;
+
 float power = 0 ; // Process Variable value calculated to adjust speeds and keep on line
 float kp = 80;  // This is the Proportional value. Tune this value to affect follow_line performance
 float kd = 7;
@@ -60,12 +65,16 @@ void setup()
   Serial.println("Setup Done");
   digitalWrite(dir_a, HIGH);
   digitalWrite(dir_b, LOW);
+  check1 = false;
+  check2 = false;
+  check3 = false;
 } // end setup
 
 int counter = 0;
 
 void loop()
 {
+
   checkForNewTile();
   if (readWideSensor(0)) {
     lastWideSensor = 0;
@@ -82,9 +91,12 @@ void loop()
     digitalWrite(dir_b, LOW);
 
     followLine();
+
+    checkCounter = 0;
     counter = 0;
   }
   else {
+
     checkDirections();
     turn();
   }
@@ -94,12 +106,6 @@ bool checkWideSensors() {
   if (readSensor(3) || readSensor(1) || readSensor(2) || readSensor(4))
   {
     return true;
-  }
-  else if (readWideSensor(0))  {
-    return false;
-  }
-  else if (readWideSensor(5)) {
-    return false;
   }
   else {
     return false;
@@ -136,10 +142,14 @@ void turn()
 {
   if (lastWideSensor == 0)
   {
-    if (counter > 150) {
+    if (counter > 125) {
       Serial.println("I can only go riiight");
-      sendLogMessage(-1);
-      direction++;
+      sendLogMessage(6);
+      if (direction == 3) {
+        direction = 0;
+      } else {
+        direction++;
+      }
       counter = 0;
     }
     counter++;
@@ -151,10 +161,14 @@ void turn()
 
   }
   if (lastWideSensor == 5) {
-    if (counter > 150) {
+    if (counter > 125) {
       Serial.println("I can only go leeeeft");
-      sendLogMessage(-1);
-      direction--;
+      sendLogMessage(5);
+      if (direction == 0) {
+        direction = 3;
+      } else {
+        direction--;
+      }
       counter = 0;
     }
     counter++;
@@ -177,12 +191,23 @@ void followLine()
 } // end follow_line
 
 void checkForNewTile() {
+  checkCounter++;
   if (!readSensor(1) && !readSensor(2) && !readSensor(3) && !readSensor(4))
   {
-    if (readWideSensor(0) && readWideSensor(5)) {
-      sendLogMessage(direction);
-      
-    }
+    check1 = true;
+  }
+  if (readWideSensor(0)) {
+    check2 = true;
+  }
+  if (readWideSensor(5)) {
+    check3 = true;
+  }
+  if (check1 && check2 && check3 && checkCounter < 75) {
+    sendLogMessage(direction);
+    check1 = false;
+    check2 = false;
+    check3 = false;
+
   }
 }
 void readLine() {

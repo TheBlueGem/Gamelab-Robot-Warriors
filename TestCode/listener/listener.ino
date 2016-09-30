@@ -127,29 +127,30 @@ void printMessage(unsigned long id) {
     case -1:
       Serial.println("Unrecognized log message");
       break;
-    case 0: // arrive from right side of the corner.
-      Serial.println("New Tile, Straight...");
-       delay(1000);
+    case 0: 
+      Serial.println("New Tile, North...");
+      delay(1500);
       break;
-    case 1: // arrive from left side of the corner.
-      Serial.println("New Tile, Right Corner...");
-       delay(1000);
+    case 1: 
+      Serial.println("New Tile, East...");
+      delay(1500);
       break;
-    case 2: // arrive from bottom side of a T tile.
-      Serial.println("New Tile, Left Corner...");
-       delay(1000);
+    case 2: 
+      Serial.println("New Tile, South...");
+      delay(1500);
       break;
-    case 3: // arrive from left side of the T.
-      Serial.println("Arrived fron the left side of a T tile...");
+    case 3: 
+      Serial.println("New Tile, West...");
+      delay(1500);
       break;
-    case 4: // arrive from right side of the T.
+    case 4: 
       Serial.println("Arrived fron the right side of a T tile...");
       break;
     case 5:
-      Serial.println("Arrived on an intersection...");
+      Serial.println("Going left...");
       break;
     case 6:
-      Serial.println("Finished!");
+      Serial.println("Going right...");
       break;
     case 7:
       Serial.println("Dead end...");
