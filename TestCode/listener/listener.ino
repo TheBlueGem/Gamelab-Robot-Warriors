@@ -120,30 +120,38 @@ boolean checkDirectionPossibility(int tileType, int tileOrientation, int moveDir
   }
   return false;
 }
-
+int o = 1;
 void printMessage(unsigned long id) {
   switch (id)
   {
     case -1:
       Serial.println("Unrecognized log message");
       break;
-    case 0: 
-      Serial.println("New Tile, North...");
-      delay(1500);
+    case 0:
+      Serial.print("New Tile, North...");
+      Serial.println(o);
+      o++;
+      delay(1000);
       break;
-    case 1: 
-      Serial.println("New Tile, East...");
-      delay(1500);
+    case 1:
+      Serial.print("New Tile, East...");
+      Serial.println(o);
+      o++;
+      delay(1000);
       break;
-    case 2: 
-      Serial.println("New Tile, South...");
-      delay(1500);
+    case 2:
+      Serial.print("New Tile, South...");
+      Serial.println(o);
+      o++;
+      delay(1000);
       break;
-    case 3: 
-      Serial.println("New Tile, West...");
-      delay(1500);
+    case 3:
+      Serial.print("New Tile, West...");
+      Serial.println(o);
+      o++;
+      delay(1000);
       break;
-    case 4: 
+    case 4:
       Serial.println("Arrived fron the right side of a T tile...");
       break;
     case 5:
@@ -182,11 +190,9 @@ void printMessage(unsigned long id) {
 }
 
 int expectedId = 1;
-int o = 1;
 bool newtilegelezen = false;
 unsigned long lastMessageId = -1;
 void loop(void) {
-
 
   //receiveMessage();
   if (myRadio.available()) {

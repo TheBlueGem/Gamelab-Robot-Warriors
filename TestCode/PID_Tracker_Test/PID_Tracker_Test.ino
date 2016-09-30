@@ -1,3 +1,5 @@
+#include <MsTimer2.h>
+
 #include "printf.h"
 #include "RF24.h"
 
@@ -42,6 +44,8 @@ bool check1;
 bool check2;
 bool check3;
 
+
+
 float power = 0 ; // Process Variable value calculated to adjust speeds and keep on line
 float kp = 80;  // This is the Proportional value. Tune this value to affect follow_line performance
 float kd = 7;
@@ -68,14 +72,14 @@ void setup()
   check1 = false;
   check2 = false;
   check3 = false;
+  MsTimer2::set(5, checkForNewTile);
+  MsTimer2::start();
 } // end setup
 
 int counter = 0;
 
 void loop()
 {
-
-  checkForNewTile();
   if (readWideSensor(0)) {
     lastWideSensor = 0;
   }
@@ -142,7 +146,7 @@ void turn()
 {
   if (lastWideSensor == 0)
   {
-    if (counter > 125) {
+    if (counter > 100) {
       Serial.println("I can only go riiight");
       sendLogMessage(6);
       if (direction == 3) {
@@ -152,7 +156,7 @@ void turn()
       }
       counter = 0;
     }
-    counter++;
+
     digitalWrite(dir_a, LOW);
     digitalWrite(dir_b, LOW);
     analogWrite(pwm_a, maxMotorSpeed);
@@ -161,7 +165,7 @@ void turn()
 
   }
   if (lastWideSensor == 5) {
-    if (counter > 125) {
+    if (counter > 100) {
       Serial.println("I can only go leeeeft");
       sendLogMessage(5);
       if (direction == 0) {
@@ -171,7 +175,6 @@ void turn()
       }
       counter = 0;
     }
-    counter++;
     digitalWrite(dir_a, HIGH);
     digitalWrite(dir_b, HIGH);
     analogWrite(pwm_a, maxMotorSpeed);
@@ -191,6 +194,7 @@ void followLine()
 } // end follow_line
 
 void checkForNewTile() {
+  counter++;
   checkCounter++;
   if (!readSensor(1) && !readSensor(2) && !readSensor(3) && !readSensor(4))
   {
@@ -202,11 +206,19 @@ void checkForNewTile() {
   if (readWideSensor(5)) {
     check3 = true;
   }
-  if (check1 && check2 && check3 && checkCounter < 75) {
+  if (check1 && check2 && check3 && checkCounter < 100) {
     sendLogMessage(direction);
     check1 = false;
     check2 = false;
     check3 = false;
+    checkCounter = 0;
+
+  }
+  if (checkCounter > 125) {
+    check1 = false;
+    check2 = false;
+    check3 = false;
+    checkCounter = 0;
 
   }
 }
