@@ -17,6 +17,8 @@ int maxMotorSpeed = 140;
 float blackThreshold = 0.75;
 int on_line = 0;
 
+bool timer;
+
 int pwm_a = 5;
 int pwm_b = 6;
 int dir_a = 4;
@@ -43,6 +45,7 @@ int checkCounter;
 bool check1;
 bool check2;
 bool check3;
+
 
 
 
@@ -73,13 +76,15 @@ void setup()
   check2 = false;
   check3 = false;
   MsTimer2::set(5, checkForNewTile);
-  MsTimer2::start();
+  timer = false;
 } // end setup
 
 int counter = 0;
 
 void loop()
 {
+
+  checkToStartTimer();
   if (readWideSensor(0)) {
     lastWideSensor = 0;
   }
@@ -93,10 +98,7 @@ void loop()
   {
     digitalWrite(dir_a, HIGH);
     digitalWrite(dir_b, LOW);
-
     followLine();
-
-    checkCounter = 0;
     counter = 0;
   }
   else {
@@ -161,7 +163,7 @@ void turn()
     digitalWrite(dir_b, LOW);
     analogWrite(pwm_a, maxMotorSpeed);
     analogWrite(pwm_b, maxMotorSpeed);
-    // delay(200);
+
 
   }
   if (lastWideSensor == 5) {
@@ -175,11 +177,13 @@ void turn()
       }
       counter = 0;
     }
+
     digitalWrite(dir_a, HIGH);
     digitalWrite(dir_b, HIGH);
     analogWrite(pwm_a, maxMotorSpeed);
     analogWrite(pwm_b, maxMotorSpeed);
     // delay(200);
+
 
   }
 }
@@ -193,34 +197,67 @@ void followLine()
   analogWrite(pwm_b, rightMotorSpeed);
 } // end follow_line
 
-void checkForNewTile() {
-  counter++;
-  checkCounter++;
+
+void checkToStartTimer() {
   if (!readSensor(1) && !readSensor(2) && !readSensor(3) && !readSensor(4))
   {
     check1 = true;
+    if (!timer)
+    {
+      timer = true;
+      MsTimer2::start();
+    }
+
   }
   if (readWideSensor(0)) {
-    check2 = true;
+    {
+      check2 = true;
+      if (!timer)
+        timer = true;
+      MsTimer2::start();
+    }
+
   }
   if (readWideSensor(5)) {
     check3 = true;
+    if (!timer)
+    {
+      timer = true;
+      MsTimer2::start();
+    }
+
   }
-  if (check1 && check2 && check3 && checkCounter < 100) {
+}
+void checkForNewTile() {
+  counter++;
+  checkCounter++;
+
+  if (check1 && check2 && check3 && checkCounter < 40) {
     sendLogMessage(direction);
+  }
+  if (checkCounter > 200) {
     check1 = false;
     check2 = false;
     check3 = false;
+    Serial.println("timer stop");
+    timer = false;
     checkCounter = 0;
-
+    MsTimer2::stop();
   }
-  if (checkCounter > 125) {
-    check1 = false;
-    check2 = false;
-    check3 = false;
-    checkCounter = 0;
-
-  }
+  /*
+  Serial.print(readWideSensor(0));
+  Serial.print(" ");
+  Serial.print(readSensor(1));
+  Serial.print(" ");
+  Serial.print(readSensor(2));
+  Serial.print(" ");
+  Serial.print(readSensor(3));
+  Serial.print(" ");
+  Serial.print(readSensor(4));
+  Serial.print(" ");
+  Serial.print(readWideSensor(5));
+  Serial.println(" ");
+*/
 }
 void readLine() {
 
@@ -327,7 +364,7 @@ bool readWideSensor(int sensor)
       break;
   }
   detectedValue = static_cast<float>(sensorValue) / static_cast<float>(range);
-  if (detectedValue > 0.85) {
+  if (detectedValue > 0.75) {
     return true;
   }
   else
