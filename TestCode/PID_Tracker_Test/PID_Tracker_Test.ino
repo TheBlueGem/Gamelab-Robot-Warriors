@@ -1,5 +1,4 @@
 #include <MsTimer2.h>
-
 #include "printf.h"
 #include "RF24.h"
 
@@ -14,10 +13,10 @@ float lastReading = 0;
 int rightMotorSpeed = 0;
 int leftMotorSpeed = 0;
 int maxMotorSpeed = 140;
-float blackThreshold = 0.75;
+float blackThreshold = 0.80;
 int on_line = 0;
 
-bool timer;
+bool timerStarted;
 
 int pwm_a = 5;
 int pwm_b = 6;
@@ -36,23 +35,28 @@ float totalError = 0;
 RF24 myRadio(9, 10);
 
 // Topology
-const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL }; // Radio pipe addresses for the 2 nodes to communicate.
+const uint64_t pipes[4] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL, 0xF0F0F0F0A1LL, 0xF0F0F0F0A2LL }; // Radio pipe addresses for the 2 nodes to communicate.
 
 bool onLine = true;
 bool opdelijn;
 
-int checkCounter;
+int checkCounter = 0;
 bool check1;
 bool check2;
 bool check3;
-
-
-
+bool messageConfirmed = false;
 
 float power = 0 ; // Process Variable value calculated to adjust speeds and keep on line
 float kp = 80;  // This is the Proportional value. Tune this value to affect follow_line performance
 float kd = 7;
 float ki = 0.0040;
+
+bool sensor0 = false;
+bool sensor1 = false;
+bool sensor2 = false;
+bool sensor3 = false;
+bool sensor4 = false;
+bool sensor5 = false;
 
 void setup()
 {
@@ -69,30 +73,54 @@ void setup()
   pinMode(pwm_b, OUTPUT);
   pinMode(dir_a, OUTPUT);
   pinMode(dir_b, OUTPUT);
-  Serial.println("Setup Done");
+  Serial.println(F("Setup Done"));
   digitalWrite(dir_a, HIGH);
   digitalWrite(dir_b, LOW);
   check1 = false;
   check2 = false;
   check3 = false;
-  MsTimer2::set(5, checkForNewTile);
-  timer = false;
+  MsTimer2::set(10, checkForNewTile);
+  timerStarted = false;
 } // end setup
 
 int counter = 0;
 
 void loop()
 {
+  sensor0 = readSensor(0);
+  sensor1 = readSensor(1);
+  sensor2 = readSensor(2);
+  sensor3 = readSensor(3);
+  sensor4 = readSensor(4);
+  sensor5 = readSensor(5);
 
+  Serial.print(sensor0);
+  Serial.print(" ");
+  
+  Serial.print(sensor1);
+  Serial.print(" ");
+  
+  Serial.print(sensor2);
+  Serial.print(" ");
+  
+  Serial.print(sensor3);
+  Serial.print(" ");
+  
+  Serial.print(sensor4);
+  Serial.print(" ");
+  
+  Serial.print(sensor5);
+  Serial.println(" ");
+  
   checkToStartTimer();
-  if (readWideSensor(0)) {
+  if (sensor0) {
     lastWideSensor = 0;
   }
-  if (readWideSensor(5)) {
+  if (sensor5) {
     lastWideSensor = 5;
   }
 
-  onLine = checkWideSensors();
+  onLine = checkOnLine();
 
   if (onLine)
   {
@@ -102,14 +130,13 @@ void loop()
     counter = 0;
   }
   else {
-
-    checkDirections();
+    //checkDirections();
     turn();
   }
 }  // end main loop
 
-bool checkWideSensors() {
-  if (readSensor(3) || readSensor(1) || readSensor(2) || readSensor(4))
+bool checkOnLine() {
+  if (sensor1 || sensor2 || sensor3 || sensor4)
   {
     return true;
   }
@@ -119,8 +146,8 @@ bool checkWideSensors() {
 }
 
 void checkDirections() {
-  if (readWideSensor(0))  {
-    if (readWideSensor(5)) {
+  if (sensor0)  {
+    if (sensor5) {
       digitalWrite(dir_a, HIGH);
       digitalWrite(dir_b, LOW);
       analogWrite(pwm_a, maxMotorSpeed);
@@ -136,7 +163,6 @@ void turnLeft() {
   analogWrite(pwm_b, maxMotorSpeed);
 }
 
-
 void turnRight() {
   digitalWrite(dir_a, LOW);
   digitalWrite(dir_b, LOW);
@@ -149,7 +175,7 @@ void turn()
   if (lastWideSensor == 0)
   {
     if (counter > 100) {
-      Serial.println("I can only go riiight");
+      Serial.println(F("I can only go riiight"));
       sendLogMessage(6);
       if (direction == 3) {
         direction = 0;
@@ -159,16 +185,12 @@ void turn()
       counter = 0;
     }
 
-    digitalWrite(dir_a, LOW);
-    digitalWrite(dir_b, LOW);
-    analogWrite(pwm_a, maxMotorSpeed);
-    analogWrite(pwm_b, maxMotorSpeed);
-
-
+    turnRight();
   }
+
   if (lastWideSensor == 5) {
     if (counter > 100) {
-      Serial.println("I can only go leeeeft");
+      Serial.println(F("I can only go leeeeft"));
       sendLogMessage(5);
       if (direction == 0) {
         direction = 3;
@@ -178,13 +200,7 @@ void turn()
       counter = 0;
     }
 
-    digitalWrite(dir_a, HIGH);
-    digitalWrite(dir_b, HIGH);
-    analogWrite(pwm_a, maxMotorSpeed);
-    analogWrite(pwm_b, maxMotorSpeed);
-    // delay(200);
-
-
+    turnLeft();
   }
 }
 
@@ -197,70 +213,68 @@ void followLine()
   analogWrite(pwm_b, rightMotorSpeed);
 } // end follow_line
 
-
-void checkToStartTimer() {
-  if (!readSensor(1) && !readSensor(2) && !readSensor(3) && !readSensor(4))
+bool notCheckPIDSensors()
+{
+  if (!sensor1 && !sensor2 && !sensor3 && !sensor4) {
+    return true;
+  }
+  else
   {
-    check1 = true;
-    if (!timer)
-    {
-      timer = true;
-      MsTimer2::start();
-    }
-
-  }
-  if (readWideSensor(0)) {
-    {
-      check2 = true;
-      if (!timer)
-        timer = true;
-      MsTimer2::start();
-    }
-
-  }
-  if (readWideSensor(5)) {
-    check3 = true;
-    if (!timer)
-    {
-      timer = true;
-      MsTimer2::start();
-    }
-
+    return false;
   }
 }
-void checkForNewTile() {
-  counter++;
-  checkCounter++;
 
-  if (check1 && check2 && check3 && checkCounter < 40) {
-    sendLogMessage(direction);
+void checkToStartTimer() {
+  if ((notCheckPIDSensors() || sensor0 || sensor5) && !timerStarted) {
+    timerStarted = true;
+    Serial.println(F("Started Timer..."));
+    MsTimer2::start();
   }
-  if (checkCounter > 200) {
+}
+
+void checkForNewTile() {
+  checkCounter++;
+  if (checkCounter < 50) {
+    if (notCheckPIDSensors() && !check1)
+    {
+      check1 = true;
+      //Serial.println("check1!");
+    }
+
+    if (sensor0 && !check2) {
+      check2 = true;
+      //Serial.println("check2!");
+    }
+
+    if (sensor5 && !check3) {
+      check3 = true;
+      //Serial.println("check3!");
+    }
+
+    if (check1 && check2 && check3) {
+      check1 = false;
+      check2 = false;
+      check3 = false;
+      Serial.println(F("Stopped Timer... Checks passed..."));
+      timerStarted = false;
+      sendLogMessage(direction);
+      checkCounter = 0;
+      MsTimer2::stop();
+    }
+  }
+  else
+  {
     check1 = false;
     check2 = false;
     check3 = false;
-    Serial.println("timer stop");
-    timer = false;
+    timerStarted = false;
     checkCounter = 0;
     MsTimer2::stop();
+    //Serial.println(F("Stopped Timer... Timed Out..."));
   }
-  /*
-  Serial.print(readWideSensor(0));
-  Serial.print(" ");
-  Serial.print(readSensor(1));
-  Serial.print(" ");
-  Serial.print(readSensor(2));
-  Serial.print(" ");
-  Serial.print(readSensor(3));
-  Serial.print(" ");
-  Serial.print(readSensor(4));
-  Serial.print(" ");
-  Serial.print(readWideSensor(5));
-  Serial.println(" ");
-*/
+
 }
 void readLine() {
-
   for (int i = 0; i < 4; i++) {
     sensorReadings[i] = readSensor(sensor[i]);
     if (sensorReadings[i] == 1) {
@@ -270,12 +284,11 @@ void readLine() {
   }
 
   if (activeSensors == 0) {
-
-    if (readWideSensor(0) || lastWideSensor == 0) {
+    if (sensor0 || lastWideSensor == 0) {
       avgReading = -1;
       return;
     }
-    if (readWideSensor(5) || lastWideSensor == 5) {
+    if (sensor5 || lastWideSensor == 5) {
       avgReading = 6;
       return;
     }
@@ -336,56 +349,14 @@ bool readSensor(int sensor)
   }
 }
 
-bool readWideSensor(int sensor)
-{
-  int sensorValue;
-  int range = 1024;
-  float detectedValue;
-
-  switch (sensor)
-  {
-    case 0: // read sensor 0.
-      sensorValue = analogRead(A0);
-      break;
-    case 1: // read sensor 1.
-      sensorValue = analogRead(A1);
-      break;
-    case 2: // read sensor 2.
-      sensorValue = analogRead(A2);
-      break;
-    case 3: // read sensor 3.
-      sensorValue = analogRead(A3);
-      break;
-    case 4: // read sensor 4.
-      sensorValue = analogRead(A4);
-      break;
-    case 5: // read sensor 5.
-      sensorValue = analogRead(A5);
-      break;
-  }
-  detectedValue = static_cast<float>(sensorValue) / static_cast<float>(range);
-  if (detectedValue > 0.75) {
-    return true;
-  }
-  else
-  {
-    return false;
-  }
-}
-
 void calcPID() {
-
   readLine();
 
   previousError = error;
   error = avgReading - 2.5;
   totalError += error;
 
-
-
   power = (kp * error) + (kd * (error - previousError)) + (ki * totalError);
-
-
   //Serial.print(previousError);
   //Serial.print(" ");
   // Serial.print(error);
@@ -411,29 +382,33 @@ void calcPID() {
   }
 }
 
-int lastMessageId = -1;
+unsigned long lastMessageId = -1;
+unsigned long lastMessageTime = 0;
 
-void logString(int messageId, String message)
-{
-  if (messageId != lastMessageId) {
-    Serial.println(message);
-    lastMessageId = messageId;
+void sendLogMessage(unsigned long messageId) { 
+    //Serial.println("Sending...");
+    if(millis() - lastMessageTime > 250 || lastMessageId != messageId){
+    myRadio.stopListening();
+    unsigned long confirmId = 0;
+    bool ok = myRadio.write(&messageId, sizeof(unsigned long));
+
+    if (ok) {      
+      //delay(2000);
+      printf("Message Sent:  %d \n", messageId);      
+      lastMessageId = messageId;
+      myRadio.startListening();
+      lastMessageTime = millis();
+
+     /* if (myRadio.available()) {
+        Serial.println("Listening for confirmation...");
+        while (!messageConfirmed) {
+          messageConfirmed = myRadio.read(&confirmId, sizeof(unsigned long));
+          Serial.println(confirmId);
+          Serial.println("Confirmed");
+        }
+      }*/
+    }
   }
-}
-
-int currentPackageId = 0;
-
-void sendLogMessage(int messageId) {
-  //  if (messageId != lastMessageId) {
-  myRadio.stopListening();
-  unsigned long id = messageId;
-  bool ok = myRadio.write(&id, sizeof(unsigned long));
-  if (ok) {
-    printf("Message Send:  %d \n", messageId);
-  }
-  lastMessageId = messageId;
-  myRadio.startListening();
-
 }
 
 
