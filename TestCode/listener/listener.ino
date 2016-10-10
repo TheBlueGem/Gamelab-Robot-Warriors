@@ -35,8 +35,8 @@ void setup()
   Serial.begin(9600);
   printf_begin();
   myRadio.begin();
-  myRadio.openWritingPipe(pipes[2]);
-  myRadio.openReadingPipe(1, pipes[3]);
+  myRadio.openWritingPipe(pipes[0]);
+  myRadio.openReadingPipe(1, pipes[1]);
   myRadio.stopListening();
   myRadio.startListening();
   Serial.println("Setup");
@@ -130,56 +130,54 @@ void printMessage(unsigned long id) {
       Serial.println("Unrecognized log message");
       break;
     case 0:
-      Serial.print("New Tile, North...");
-      Serial.println(o);
+      Serial.print("Dead end...");
+      //Serial.println(o);
       o++;
       break;
     case 1:
-      Serial.print("New Tile, East...");
-      Serial.println(o);
+      Serial.print("Left corner...");
+      //Serial.println(o);
       o++;
       break;
     case 2:
-      Serial.print("New Tile, South...");
-      Serial.println(o);
+      Serial.print("Right corner...");
+      //Serial.println(o);
       o++;
       break;
     case 3:
-      Serial.print("New Tile, West...");
-      Serial.println(o);
+      Serial.print("Arrived fron the left side of a T tile...");
+      //Serial.println(o);
       o++;
       break;
     case 4:
-      Serial.println("Arrived fron the right side of a T tile...");
+      Serial.println("Arrived fron the middle side of a T tile...");
       break;
     case 5:
-      Serial.println("Going left...");
+      Serial.println("Arrived fron the right side of a T tile...");
       break;
     case 6:
-      Serial.println("Going right...");
+      Serial.println("Straight tile...");
       break;
     case 7:
       Serial.println("Dead end...");
       break;
-    case 8:
+    /*case 8:
       Serial.println("Moving Straight...");
       break;
     case 9:
       Serial.println("Moving left...");
-      break;
+      break;*/
     case 10:
-      Serial.println("Moving right...");
+      Serial.println("Moving North...");
       break;
     case 11:
-      Serial.println("Moving left wide...");
+      Serial.println("Moving East...");
       break;
     case 12:
-      Serial.println("Moving right wide...");
+      Serial.println("Moving South...");
       break;
-    case 14:
-      Serial.print("1");
-      Serial.print("2");
-      Serial.println("7");
+    case 13:
+      Serial.print("Moving West...");
       break;
   }
 
@@ -195,8 +193,13 @@ void loop(void) {
     unsigned long receivedId;
     bool hasRead = myRadio.read(&receivedId, sizeof(unsigned long));
     if (hasRead) {      
-      if (receivedId != lastMessageId || (millis() - lastMessageTime) > 1000) { 
+      if (receivedId != lastMessageId || (millis() - lastMessageTime) > 500) { 
 
+        Serial.print("Last message ID: ");
+        Serial.print(lastMessageId);
+        Serial.print("Last Message Time (millis): ");
+        Serial.print(lastMessageTime);
+        Serial.println();
         printMessage(receivedId);
         myRadio.stopListening();
         /*unsigned long sentId = 1;
