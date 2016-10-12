@@ -126,11 +126,8 @@ int o = 1;
 void printMessage(unsigned long id) {
   switch (id)
   {
-    case -1:
-      Serial.println("Unrecognized log message");
-      break;
     case 0:
-      Serial.print("Dead end...");
+      Serial.print("Unrecognized log message");
       //Serial.println(o);
       o++;
       break;
@@ -177,13 +174,13 @@ void printMessage(unsigned long id) {
       Serial.println("Moving South...");
       break;
     case 13:
-      Serial.print("Moving West...");
+      Serial.println("Moving West...");
       break;
   }
 
 }
 
-unsigned long lastMessageId = -1;
+unsigned long lastMessageId = 0;
 
 unsigned long lastMessageTime = 0;
 
@@ -197,7 +194,7 @@ void loop(void) {
 
         Serial.print("Last message ID: ");
         Serial.print(lastMessageId);
-        Serial.print("Last Message Time (millis): ");
+        Serial.print(" Last Message Time (millis): ");
         Serial.print(lastMessageTime);
         Serial.println();
         printMessage(receivedId);

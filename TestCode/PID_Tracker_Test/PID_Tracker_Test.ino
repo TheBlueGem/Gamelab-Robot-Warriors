@@ -84,6 +84,8 @@ void setup()
 } // end setup
 
 int counter = 0;
+bool lineNearMiddle = false;
+bool timer;
 
 void loop()
 {
@@ -94,21 +96,26 @@ void loop()
   sensor4 = readSensor(4);
   sensor5 = readSensor(5);
 
-  /*Serial.print(sensor0);
-    Serial.print(" ");
-    Serial.print(sensor1);
-    Serial.print(" ");
-    Serial.print(sensor2);
-    Serial.print(" ");
-    Serial.print(sensor3);
-    Serial.print(" ");
-    Serial.print(sensor4);
-    Serial.print(" ");
-    Serial.print(sensor5);
-    Serial.println(" ");
-  */
-  onLine = checkOnLine();
+  lineNearMiddle = checkPIDSensors();
 
+  onLine = checkOnLine();
+  //checkForNewTile();
+    
+  
+  if (sensor0) {
+    turn();
+  }
+  else if(checkPIDSensors())
+  {
+    digitalWrite(dir_a, HIGH);
+    digitalWrite(dir_b, LOW);
+    followLine();
+    //Serial.println("Going");
+  }
+  else
+  {
+    turn();
+  }
  /*if (sensor0) {
     /*if (sensor5) {
       if (notCheckPIDSensors()) {
@@ -143,7 +150,7 @@ void loop()
       Serial.println("Burning");
     //}
   }*/
-  if (onLine) {
+  /*if (onLine) {
     digitalWrite(dir_a, HIGH);
     digitalWrite(dir_b, LOW);
     followLine();
@@ -158,19 +165,19 @@ void loop()
     {
       counter = 0;
     }
-  }
+  }*/
 }  // end main loop
 
 bool checkOnLine() {
   if (sensor0) {
     lastWideSensor = 0;
-    return false;
+    
   }
-  else if (sensor5) {
+  if (sensor5) {
     lastWideSensor = 5;
-    return false;
+    
   }
-  else if (sensor1 || sensor2 || sensor3 || sensor4)
+  else if (lineNearMiddle)
   {
     return true;
   }
@@ -195,10 +202,12 @@ void turnRight() {
 
 unsigned long lastDirectionChange = 0;
 
+
 void turn()
 {
   if (lastWideSensor == 0)
   {
+    
     if ((millis() - lastDirectionChange) > 500) {
       lastDirectionChange = millis();
 
@@ -207,17 +216,18 @@ void turn()
       } else {
         direction++;
       }
-
     }
+    
     sendLogMessage(direction);
-
+    
     turnRight();
   }
 
   if (lastWideSensor == 5) {
+    
     if ((millis() - lastDirectionChange) > 500) {
-
       lastDirectionChange = millis();
+      
       if (direction == 10) {
         direction = 13;
       } else {
@@ -226,10 +236,9 @@ void turn()
     }
 
     sendLogMessage(direction);
-
+    }
     turnLeft();
-  }
-
+  
 }
 
 // line following subroutine
@@ -240,6 +249,54 @@ void followLine()
   analogWrite(pwm_a, leftMotorSpeed);
   analogWrite(pwm_b, rightMotorSpeed);
 } // end follow_line
+
+
+int timerCount;
+bool S0 = false;
+bool S5 = false;
+
+void checkForNewTile() {
+  bool result = false;
+  if (!timer && notCheckPIDSensors())
+  {
+    timer = true;
+  }
+  if (timer) {
+    timerCount++;
+    //Serial.println(timerCount);
+    /*if (readSensor(0)) {
+      S0 = true;
+      //Serial.println("Sensor 0 = true");
+    }
+    if (readSensor(5)) {
+      S5 = true;
+       // Serial.println("Sensor 5 = true");
+    }*/
+    if (checkPIDSensors() && timerCount < 400) {
+      sendLogMessage(6);
+      timerCount = 401;
+      result = true;
+    }
+    if (timerCount > 401) {
+      S0 = false;
+      S5 = false;
+      timerCount = 0;
+      timer = false;
+    }
+  }
+}
+
+int deadEnd = 0;
+void checkForDeadEnd(){
+  if (notCheckPIDSensors() && !readSensor(0) && !readSensor(5))
+  {
+    deadEnd++;
+  }
+  if(deadEnd > 750){
+    deadEnd = 0;
+  }
+  
+}
 
 bool notCheckPIDSensors()
 {
@@ -365,6 +422,7 @@ unsigned long lastMessageTime = 0;
 void sendLogMessage(unsigned long messageId) {
   //Serial.println("Sending...");
   //if((millis() - lastMessageTime) > 500){
+  
   myRadio.stopListening();
   unsigned long confirmId = 0;
   bool ok = myRadio.write(&messageId, sizeof(unsigned long));

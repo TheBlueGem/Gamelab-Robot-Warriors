@@ -13,9 +13,7 @@ void loop() {
   double range = 1024;
 
   int sensor0 = analogRead(A0);
-  double detectedValue0 = (double) sensor0 / (double) range;  
-
- 
+  double detectedValue0 = (double) sensor0 / (double) range;   
   
   int sensor1 = analogRead(A1);
   double detectedValue1 = (double) sensor1 / (double) range;  
