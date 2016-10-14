@@ -91,7 +91,8 @@ void loop()
   sensor3 = readSensor(3);
   sensor4 = readSensor(4);
   sensor5 = readSensor(5);
-  if (deadEndTurn && turnCounter < 200) {
+
+  if (deadEndTurn && turnCounter < 1200) {
     if (turnCounter < 65) {
       straight();
     }
@@ -100,9 +101,14 @@ void loop()
       turnRight();
     }
     turnCounter++;
+    if ((sensor2 || sensor3) && turnCounter > 1000) {
+      deadEndTurn = false;
+      turnCounter = 0;
+    }
   }
-  else if ((turningRight || turningLeft) && turnCounter < 165) {
-    if (turnCounter < 65) {
+  else if ((turningRight || turningLeft) && turnCounter < 800)
+  {
+    if (turnCounter < 200) {
       straight();
     }
     else
@@ -117,11 +123,11 @@ void loop()
     }
 
     turnCounter++;
-    /*if(sensor2 || sensor3){
+    if ((sensor2 || sensor3) && turnCounter > 500) {
       turningRight = false;
       turningLeft = false;
       turnCounter = 0;
-      }*/
+    }
   }
   else
   {
@@ -183,14 +189,16 @@ void loop()
     }
   }
 
-  if (!deadEndPossible && noDeadEndCounter < 500) {
-    noDeadEndCounter++;
-  }
-  else
-  {
-    if (!deadEndPossible ) {
-      deadEndPossible = true;
-      //sendLogMessage(2);
+  if (!deadEndTurn) {
+    if (!deadEndPossible && noDeadEndCounter < 500) {
+      noDeadEndCounter++;
+    }
+    else
+    {
+      if (!deadEndPossible ) {
+        deadEndPossible = true;
+        //sendLogMessage(2);
+      }
     }
   }
 
@@ -208,9 +216,18 @@ void checkForDeadEnd() {
     }
 
     if (deadEndCounter >= 100) {
+      direction = direction - 2;
+      if(direction == 8){
+        direction = 12;
+      }
+      else if(direction == 9){
+        direction = 13;        
+      }
+
       deadEndPossible = false;
       deadEndCounter = 0;
-      sendLogMessage(7);
+      //sendLogMessage(7);
+      sendLogMessage(direction);
       deadEndTurn = true;
     }
 
