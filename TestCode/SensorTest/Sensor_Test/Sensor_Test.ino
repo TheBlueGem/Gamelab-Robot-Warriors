@@ -38,10 +38,14 @@ void loop() {
   
   Serial.print(detectedValue0);
   Serial.print(" ");  
+   Serial.print(detectedValue1);
+  Serial.print(" ");  
   Serial.print(detectedValue2);
   Serial.print(" ");
   Serial.print(detectedValue3);
   Serial.print(" ");
+   Serial.print(detectedValue4);
+  Serial.print(" ");  
   Serial.print(detectedValue5);
   Serial.println(" ");
 }

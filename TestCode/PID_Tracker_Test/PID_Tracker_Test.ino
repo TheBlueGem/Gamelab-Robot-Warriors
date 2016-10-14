@@ -1,4 +1,3 @@
-#include <MsTimer2.h>
 #include "printf.h"
 #include "RF24.h"
 
@@ -13,17 +12,15 @@ float lastReading = 0;
 int rightMotorSpeed = 0;
 int leftMotorSpeed = 0;
 int maxMotorSpeed = 140;
-float blackThreshold = 0.80;
+float blackThreshold = 0.75;
 int on_line = 0;
-
-bool timerStarted;
 
 int pwm_a = 5;
 int pwm_b = 6;
 int dir_a = 4;
 int dir_b = 7;
 
-int direction = 10; // 10 = Robot North, 11 = Robot East, 12 = Robot South, 13 = Robot West.
+int direction = 10; // 0 = Robot North, 1 = Robot East, 2 = Robot South, 3 = Robot West.
 
 bool c = false;
 int lastWideSensor = 9;
@@ -35,29 +32,36 @@ float totalError = 0;
 RF24 myRadio(9, 10);
 
 // Topology
-const uint64_t pipes[4] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL, 0xF0F0F0F0A1LL, 0xF0F0F0F0A2LL }; // Radio pipe addresses for the 2 nodes to communicate.
+const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL }; // Radio pipe addresses for the 2 nodes to communicate.
 
 bool onLine = true;
 bool opdelijn;
-
-int checkCounter = 0;
-bool check1;
-bool check2;
-bool check3;
-bool turning = false;
-bool messageConfirmed = false;
 
 float power = 0 ; // Process Variable value calculated to adjust speeds and keep on line
 float kp = 80;  // This is the Proportional value. Tune this value to affect follow_line performance
 float kd = 7;
 float ki = 0.0040;
 
+bool timer;
+int timerCount;
 bool sensor0 = false;
 bool sensor1 = false;
 bool sensor2 = false;
 bool sensor3 = false;
 bool sensor4 = false;
 bool sensor5 = false;
+
+bool turningRight = false;
+bool turningLeft = false;
+bool checkingForDeadEnd = false;
+int turnCounter = 0;
+bool deadEndPossible = false;
+int noDeadEndCounter = 0;
+int deadEndCounter = 0;
+bool deadEndTurn = false;
+
+
+unsigned long lastDirectionChange = 0;
 
 void setup()
 {
@@ -74,18 +78,10 @@ void setup()
   pinMode(pwm_b, OUTPUT);
   pinMode(dir_a, OUTPUT);
   pinMode(dir_b, OUTPUT);
+  Serial.println("Setup Done");
   digitalWrite(dir_a, HIGH);
   digitalWrite(dir_b, LOW);
-  check1 = false;
-  check2 = false;
-  check3 = false;
-  timerStarted = false;  
-  Serial.println(F("Setup Done"));
 } // end setup
-
-int counter = 0;
-bool lineNearMiddle = false;
-bool timer;
 
 void loop()
 {
@@ -95,150 +91,200 @@ void loop()
   sensor3 = readSensor(3);
   sensor4 = readSensor(4);
   sensor5 = readSensor(5);
-
-  lineNearMiddle = checkPIDSensors();
-
-  onLine = checkOnLine();
-  //checkForNewTile();
-    
-  
-  if (sensor0) {
-    turn();
-  }
-  else if(checkPIDSensors())
-  {
-    digitalWrite(dir_a, HIGH);
-    digitalWrite(dir_b, LOW);
-    followLine();
-    //Serial.println("Going");
-  }
-  else
-  {
-    turn();
-  }
- /*if (sensor0) {
-    /*if (sensor5) {
-      if (notCheckPIDSensors()) {
-        sendLogMessage(8);
-      }
+  if (deadEndTurn && turnCounter < 200) {
+    if (turnCounter < 65) {
+      straight();
     }
     else
     {
-      //sendLogMessage(2);
-      turn();
-      Serial.println("Turning");
-    //}
+      turnRight();
+    }
+    turnCounter++;
   }
-  else if (checkPIDSensors())
-  {
-    digitalWrite(dir_a, HIGH);
-    digitalWrite(dir_b, LOW);
-    followLine();
-    Serial.println("Going");
-  }
-  else
-  {
-    /*if (sensor0) {
-      if (notCheckPIDSensors()) {
-        sendLogMessage(8);
-      }
+  else if ((turningRight || turningLeft) && turnCounter < 165) {
+    if (turnCounter < 65) {
+      straight();
     }
     else
     {
+      if (turningRight) {
+        turnRight();
+      }
+      else
+      {
+        turnLeft();
+      }
+    }
+
+    turnCounter++;
+    /*if(sensor2 || sensor3){
+      turningRight = false;
+      turningLeft = false;
+      turnCounter = 0;
+      }*/
+  }
+  else
+  {
+    deadEndTurn = false;
+    turningRight = false;
+    turningLeft = false;
+    checkingForDeadEnd = false;
+    turnCounter = 0;
+
+    checkForNewTile();
+
+    onLine = checkPIDSensors();
+
+    if (deadEndPossible && (sensor0 || sensor5)) {
       //sendLogMessage(1);
-      turn();
-      Serial.println("Burning");
-    //}
-  }*/
-  /*if (onLine) {
-    digitalWrite(dir_a, HIGH);
-    digitalWrite(dir_b, LOW);
-    followLine();
+      deadEndPossible = false;
+      noDeadEndCounter = 0;
+      deadEndCounter = 0;
     }
-    else
-    {
-    if(counter < 50){
-    turn();
-    counter++;
-    }
-    else
-    {
-      counter = 0;
-    }
-  }*/
-}  // end main loop
 
-bool checkOnLine() {
-  if (sensor0) {
-    lastWideSensor = 0;
-    
+    if (sensor0) {
+      turningRight = true;
+
+      if ((millis() - lastDirectionChange) > 1000) {
+        lastDirectionChange = millis();
+
+        if (direction == 13) {
+          direction = 10;
+        } else {
+          direction++;
+        }
+        sendLogMessage(direction);
+      }
+    }
+    else if (checkPIDSensors())
+    {
+      digitalWrite(dir_a, HIGH);
+      digitalWrite(dir_b, LOW);
+
+      deadEndCounter = 0;
+      followLine();
+    }
+    else if (sensor5) {
+      turningLeft = true;
+      if ((millis() - lastDirectionChange) > 1000) {
+        lastDirectionChange = millis();
+
+        if (direction == 10) {
+          direction = 13;
+        } else {
+          direction--;
+        }
+        sendLogMessage(direction);
+      }
+    }
+    else if (deadEndPossible)
+    {
+      checkForDeadEnd();
+    }
   }
-  if (sensor5) {
-    lastWideSensor = 5;
-    
+
+  if (!deadEndPossible && noDeadEndCounter < 500) {
+    noDeadEndCounter++;
   }
-  else if (lineNearMiddle)
+  else
   {
-    return true;
+    if (!deadEndPossible ) {
+      deadEndPossible = true;
+      //sendLogMessage(2);
+    }
   }
-  else {
-    return false;
+
+} // end main loop
+
+void checkForDeadEnd() {
+  if (!deadEndTurn) {
+    if (!sensor0 && !sensor1 && !sensor2 && !sensor3 && !sensor4 && !sensor5)
+    {
+      deadEndCounter++;
+    }
+    else
+    {
+      deadEndCounter = 0;
+    }
+
+    if (deadEndCounter >= 100) {
+      deadEndPossible = false;
+      deadEndCounter = 0;
+      sendLogMessage(7);
+      deadEndTurn = true;
+    }
+
   }
+}
+
+void checkDirections() {
+  if (sensor0)  {
+    if (sensor5) {
+      digitalWrite(dir_a, HIGH);
+      digitalWrite(dir_b, LOW);
+      analogWrite(pwm_a, maxMotorSpeed);
+      analogWrite(pwm_b, maxMotorSpeed);
+    }
+  }
+}
+
+void straight() {
+  digitalWrite(dir_a, HIGH);
+  digitalWrite(dir_b, LOW);
+  analogWrite(pwm_a, maxMotorSpeed);
+  analogWrite(pwm_b, maxMotorSpeed);
+
 }
 
 void turnLeft() {
   digitalWrite(dir_a, HIGH);
   digitalWrite(dir_b, HIGH);
-  analogWrite(pwm_a, maxMotorSpeed);
-  analogWrite(pwm_b, maxMotorSpeed);
+  analogWrite(pwm_a, maxMotorSpeed - 20);
+  analogWrite(pwm_b, maxMotorSpeed + 20);
 }
 
 void turnRight() {
   digitalWrite(dir_a, LOW);
   digitalWrite(dir_b, LOW);
-  analogWrite(pwm_a, maxMotorSpeed);
-  analogWrite(pwm_b, maxMotorSpeed);
+  analogWrite(pwm_a, maxMotorSpeed + 20);
+  analogWrite(pwm_b, maxMotorSpeed - 20);
 }
-
-unsigned long lastDirectionChange = 0;
-
 
 void turn()
 {
   if (lastWideSensor == 0)
   {
-    
-    if ((millis() - lastDirectionChange) > 500) {
-      lastDirectionChange = millis();
+    if (!timer) {
+      if ((millis() - lastDirectionChange) > 1000) {
+        lastDirectionChange = millis();
 
-      if (direction == 13) {
-        direction = 10;
-      } else {
-        direction++;
+        if (direction == 13) {
+          direction = 10;
+        } else {
+          direction++;
+        }
+        sendLogMessage(direction);
       }
     }
-    
-    sendLogMessage(direction);
-    
     turnRight();
   }
 
-  if (lastWideSensor == 5) {
-    
-    if ((millis() - lastDirectionChange) > 500) {
-      lastDirectionChange = millis();
-      
-      if (direction == 10) {
-        direction = 13;
-      } else {
-        direction--;
+  if (lastWideSensor == 5)
+  {
+    if (!timer) {
+      if ((millis() - lastDirectionChange) > 1000) {
+        lastDirectionChange = millis();
+
+        if (direction == 10) {
+          direction = 13;
+        } else {
+          direction--;
+        }
+        sendLogMessage(direction);
       }
     }
-
-    sendLogMessage(direction);
-    }
     turnLeft();
-  
+  }
 }
 
 // line following subroutine
@@ -250,67 +296,55 @@ void followLine()
   analogWrite(pwm_b, rightMotorSpeed);
 } // end follow_line
 
+int whiteCount = 0;
+bool whiteAvailable = true;
 
-int timerCount;
-bool S0 = false;
-bool S5 = false;
-
-void checkForNewTile() {
-  bool result = false;
-  if (!timer && notCheckPIDSensors())
+bool checkForNewTile() {
+  if (!timer && !sensor1 && !sensor2 && !sensor3 && !sensor4)
   {
     timer = true;
+    Serial.println("Timer Started...");
   }
+
+  if (timer) {
+    if (!sensor1 && !sensor2 && !sensor3 && !sensor4 && whiteAvailable) {
+      whiteCount++;
+      whiteAvailable = false;
+      Serial.print("White Count: ");
+      Serial.println(whiteCount);
+    }
+    else if (checkPIDSensors()) {
+      whiteAvailable = true;
+    }
+  }
+
   if (timer) {
     timerCount++;
-    //Serial.println(timerCount);
-    /*if (readSensor(0)) {
-      S0 = true;
-      //Serial.println("Sensor 0 = true");
+    if (!sensor0 && !sensor5 && checkPIDSensors() && timerCount <= 500) {
+      if (whiteCount == 3) {
+        whiteCount = 0;
+        sendLogMessage(6);
+        timerCount = 0;
+        timer = false;
+        whiteAvailable = true;
+        Serial.println("Timer Stopped Straight Tile Found...");
+        return true;
+      }
     }
-    if (readSensor(5)) {
-      S5 = true;
-       // Serial.println("Sensor 5 = true");
-    }*/
-    if (checkPIDSensors() && timerCount < 400) {
-      sendLogMessage(6);
-      timerCount = 401;
-      result = true;
+    if (timerCount > 100 && whiteCount == 1 && !sensor1 && !sensor2 && !sensor3 && !sensor4) {
+      //Serial.println("Dead End...");
     }
-    if (timerCount > 401) {
-      S0 = false;
-      S5 = false;
-      timerCount = 0;
+    if (timerCount > 500) {
       timer = false;
+      whiteCount = 0;
+      timerCount = 0;
+      Serial.println("Timer Stopped Timeout...");
+      return false;
     }
   }
 }
 
-int deadEnd = 0;
-void checkForDeadEnd(){
-  if (notCheckPIDSensors() && !readSensor(0) && !readSensor(5))
-  {
-    deadEnd++;
-  }
-  if(deadEnd > 750){
-    deadEnd = 0;
-  }
-  
-}
-
-bool notCheckPIDSensors()
-{
-  if (!sensor1 && !sensor2 && !sensor3 && !sensor4) {
-    return true;
-  }
-  else
-  {
-    return false;
-  }
-}
-
-bool checkPIDSensors()
-{
+bool checkPIDSensors() {
   if (sensor1 || sensor2 || sensor3 || sensor4) {
     return true;
   }
@@ -330,6 +364,7 @@ void readLine() {
   }
 
   if (activeSensors == 0) {
+
     if (sensor0 || lastWideSensor == 0) {
       avgReading = -1;
       return;
@@ -339,7 +374,6 @@ void readLine() {
       return;
     }
   }
-
   if (activeSensors != 0)
   {
     avgReading = totalReading / activeSensors;
@@ -416,35 +450,57 @@ void calcPID() {
   }
 }
 
-unsigned long lastMessageId = -1;
-unsigned long lastMessageTime = 0;
+int lastMessageId = -1;
 
-void sendLogMessage(unsigned long messageId) {
-  //Serial.println("Sending...");
-  //if((millis() - lastMessageTime) > 500){
-  
-  myRadio.stopListening();
-  unsigned long confirmId = 0;
-  bool ok = myRadio.write(&messageId, sizeof(unsigned long));
-
-  if (ok) {
-    //delay(2000);
-    printf("Message Sent:  %d \n", messageId);
+void logString(int messageId, String message)
+{
+  if (messageId != lastMessageId) {
+    Serial.println(message);
     lastMessageId = messageId;
-    myRadio.startListening();
-    lastMessageTime = millis();
-
-    /* if (myRadio.available()) {
-       Serial.println("Listening for confirmation...");
-       while (!messageConfirmed) {
-         messageConfirmed = myRadio.read(&confirmId, sizeof(unsigned long));
-         Serial.println(confirmId);
-         Serial.println("Confirmed");
-       }
-      }*/
-    //}
   }
 }
 
+int currentPackageId = 0;
 
+void sendLogMessage(int messageId) {
+  //  if (messageId != lastMessageId) {
+  myRadio.stopListening();
+  unsigned long id = messageId;
+  bool ok = myRadio.write(&id, sizeof(unsigned long));
+  if (ok) {
+    printf("Message Send:  %d \n", messageId);
+  }
+  lastMessageId = messageId;
+  myRadio.startListening();
+}
 
+float readSensorValue(int sensor)
+{
+  int sensorValue;
+  int range = 1024;
+  float detectedValue;
+
+  switch (sensor)
+  {
+    case 0: // read sensor 0.
+      sensorValue = analogRead(A0);
+      break;
+    case 1: // read sensor 1.
+      sensorValue = analogRead(A1);
+      break;
+    case 2: // read sensor 2.
+      sensorValue = analogRead(A2);
+      break;
+    case 3: // read sensor 3.
+      sensorValue = analogRead(A3);
+      break;
+    case 4: // read sensor 4.
+      sensorValue = analogRead(A4);
+      break;
+    case 5: // read sensor 5.
+      sensorValue = analogRead(A5);
+      break;
+  }
+  detectedValue = static_cast<float>(sensorValue) / static_cast<float>(range);
+  return detectedValue;
+}
