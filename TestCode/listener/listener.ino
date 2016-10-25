@@ -39,7 +39,7 @@ void printMessage(unsigned long id) {
       //Serial.println(o);    
       break;
     case 4:
-      Serial.println("Arrived fron the middle side of a T tile...");
+      Serial.println("Line Found!");
       break;
     case 5:
       Serial.println("Arrived fron the right side of a T tile...");

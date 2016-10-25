@@ -93,7 +93,7 @@ void loop()
   sensor5 = readSensor(5);
 
   if (deadEndTurn && turnCounter < 1200) {
-    if (turnCounter < 65) {
+    if (turnCounter < 300) {
       straight();
     }
     else
@@ -101,14 +101,14 @@ void loop()
       turnRight();
     }
     turnCounter++;
-    if ((sensor2 || sensor3) && turnCounter > 1000) {
+    if ((sensor2 || sensor3) && turnCounter > 800) {
       deadEndTurn = false;
       turnCounter = 0;
     }
   }
-  else if ((turningRight || turningLeft) && turnCounter < 800)
+  else if ((turningRight || turningLeft) && turnCounter < 1000)
   {
-    if (turnCounter < 200) {
+    if (turnCounter < 300) {
       straight();
     }
     else
@@ -122,12 +122,14 @@ void loop()
       }
     }
 
-    turnCounter++;
-    if ((sensor2 || sensor3) && turnCounter > 500) {
+    if (checkPIDSensors() && turnCounter > 500) {
       turningRight = false;
       turningLeft = false;
       turnCounter = 0;
+      followLine();
     }
+
+    turnCounter++;
   }
   else
   {
@@ -172,6 +174,7 @@ void loop()
     }
     else if (sensor5) {
       turningLeft = true;
+
       if ((millis() - lastDirectionChange) > 1000) {
         lastDirectionChange = millis();
 
@@ -187,6 +190,7 @@ void loop()
     {
       checkForDeadEnd();
     }
+
   }
 
   if (!deadEndTurn) {
@@ -202,6 +206,8 @@ void loop()
     }
   }
 
+
+
 } // end main loop
 
 void checkForDeadEnd() {
@@ -215,13 +221,13 @@ void checkForDeadEnd() {
       deadEndCounter = 0;
     }
 
-    if (deadEndCounter >= 100) {
+    if (deadEndCounter >= 200) {
       direction = direction - 2;
-      if(direction == 8){
+      if (direction == 8) {
         direction = 12;
       }
-      else if(direction == 9){
-        direction = 13;        
+      else if (direction == 9) {
+        direction = 13;
       }
 
       deadEndPossible = false;
@@ -231,17 +237,6 @@ void checkForDeadEnd() {
       deadEndTurn = true;
     }
 
-  }
-}
-
-void checkDirections() {
-  if (sensor0)  {
-    if (sensor5) {
-      digitalWrite(dir_a, HIGH);
-      digitalWrite(dir_b, LOW);
-      analogWrite(pwm_a, maxMotorSpeed);
-      analogWrite(pwm_b, maxMotorSpeed);
-    }
   }
 }
 
@@ -257,7 +252,7 @@ void turnLeft() {
   digitalWrite(dir_a, HIGH);
   digitalWrite(dir_b, HIGH);
   analogWrite(pwm_a, maxMotorSpeed - 20);
-  analogWrite(pwm_b, maxMotorSpeed + 20);
+  analogWrite(pwm_b, maxMotorSpeed + 30);
 }
 
 void turnRight() {
