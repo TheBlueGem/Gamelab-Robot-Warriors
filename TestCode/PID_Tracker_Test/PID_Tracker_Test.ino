@@ -86,24 +86,26 @@ void setup()
 void loop()
 {
   sensor0 = readSensor(0);
+  unsigned long sensor0Value = readSensorValue(0);
   sensor1 = readSensor(1);
   sensor2 = readSensor(2);
   sensor3 = readSensor(3);
   sensor4 = readSensor(4);
   sensor5 = readSensor(5);
 
-  if (deadEndTurn && turnCounter < 1200) {
-    if (turnCounter < 300) {
+  if (deadEndTurn && turnCounter < 1500) {
+    if (turnCounter < 200) {
       straight();
     }
     else
     {
-      turnRight();
+      turnLeft();
     }
     turnCounter++;
     if ((sensor2 || sensor3) && turnCounter > 800) {
       deadEndTurn = false;
       turnCounter = 0;
+      //followLine();
     }
   }
   else if ((turningRight || turningLeft) && turnCounter < 1000)
@@ -126,7 +128,7 @@ void loop()
       turningRight = false;
       turningLeft = false;
       turnCounter = 0;
-      followLine();
+      //followLine();
     }
 
     turnCounter++;
@@ -139,7 +141,7 @@ void loop()
     checkingForDeadEnd = false;
     turnCounter = 0;
 
-    checkForNewTile();
+    checkForStraightTile();
 
     onLine = checkPIDSensors();
 
@@ -162,6 +164,7 @@ void loop()
           direction++;
         }
         sendLogMessage(direction);
+        //sendLogMessage(sensor0Value);
       }
     }
     else if (checkPIDSensors())
@@ -190,24 +193,19 @@ void loop()
     {
       checkForDeadEnd();
     }
-
-  }
-
-  if (!deadEndTurn) {
-    if (!deadEndPossible && noDeadEndCounter < 500) {
-      noDeadEndCounter++;
-    }
-    else
-    {
-      if (!deadEndPossible ) {
-        deadEndPossible = true;
-        //sendLogMessage(2);
+    if (!deadEndTurn) {
+      if (!deadEndPossible && noDeadEndCounter < 800) {
+        noDeadEndCounter++;
+      }
+      else
+      {
+        if (!deadEndPossible ) {
+          deadEndPossible = true;
+          //sendLogMessage(2);
+        }
       }
     }
   }
-
-
-
 } // end main loop
 
 void checkForDeadEnd() {
@@ -236,7 +234,6 @@ void checkForDeadEnd() {
       sendLogMessage(direction);
       deadEndTurn = true;
     }
-
   }
 }
 
@@ -311,19 +308,16 @@ void followLine()
 int whiteCount = 0;
 bool whiteAvailable = true;
 
-bool checkForNewTile() {
+bool checkForStraightTile() {
   if (!timer && !sensor1 && !sensor2 && !sensor3 && !sensor4)
   {
     timer = true;
-    Serial.println("Timer Started...");
   }
 
   if (timer) {
     if (!sensor1 && !sensor2 && !sensor3 && !sensor4 && whiteAvailable) {
       whiteCount++;
       whiteAvailable = false;
-      Serial.print("White Count: ");
-      Serial.println(whiteCount);
     }
     else if (checkPIDSensors()) {
       whiteAvailable = true;
@@ -333,13 +327,12 @@ bool checkForNewTile() {
   if (timer) {
     timerCount++;
     if (!sensor0 && !sensor5 && checkPIDSensors() && timerCount <= 500) {
-      if (whiteCount == 3) {
+      if (whiteCount == 3) { //Straight Tile Found
         whiteCount = 0;
         sendLogMessage(6);
         timerCount = 0;
         timer = false;
         whiteAvailable = true;
-        Serial.println("Timer Stopped Straight Tile Found...");
         return true;
       }
     }
@@ -350,7 +343,6 @@ bool checkForNewTile() {
       timer = false;
       whiteCount = 0;
       timerCount = 0;
-      Serial.println("Timer Stopped Timeout...");
       return false;
     }
   }

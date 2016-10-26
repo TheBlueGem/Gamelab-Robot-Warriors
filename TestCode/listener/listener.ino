@@ -68,6 +68,8 @@ void printMessage(unsigned long id) {
     case 13:
       Serial.println("Moving West...");
       break;
+    default:
+      Serial.println(id);
   }
 
 }
