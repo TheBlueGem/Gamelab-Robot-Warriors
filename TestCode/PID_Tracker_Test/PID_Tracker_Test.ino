@@ -30,6 +30,7 @@ float ki = 0.0040;
 
 void setup()
 {
+  Serial.begin(9600);
   //Set control pins to be outputs
   pinMode(pwm_a, OUTPUT);
   pinMode(pwm_b, OUTPUT);
@@ -111,7 +112,8 @@ void calcPID() {
   previousError = error;
   error = avgReading - 2.5;
   totalError += error;
-
+  Serial.println(error);
+  
   power = (kp * error) + (kd * (error - previousError)) + (ki * totalError);
 
   if ( power > maxMotorSpeed) {
