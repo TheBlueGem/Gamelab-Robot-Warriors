@@ -11,7 +11,7 @@ float lastReading = 0;
 
 int rightMotorSpeed = 0;
 int leftMotorSpeed = 0;
-int maxMotorSpeed = 140;
+int maxMotorSpeed = 135;
 float blackThreshold = 0.75;
 int on_line = 0;
 
@@ -92,18 +92,13 @@ void loop()
   sensor4 = readSensor(4);
   sensor5 = readSensor(5);
 
-  if (deadEndTurn && turnCounter < 1200) {
-    if (turnCounter < 65) {
-      straight();
-    }
-    else
-    {
-      turnRight();
-    }
+  if (deadEndTurn && turnCounter < 1250) {
+    turnRight();
     turnCounter++;
     if ((sensor2 || sensor3) && turnCounter > 1000) {
-      deadEndTurn = false;
-      turnCounter = 0;
+      followLine();
+      //deadEndTurn = false;
+      //turnCounter = 0;     
     }
   }
   else if ((turningRight || turningLeft) && turnCounter < 800)
@@ -137,18 +132,13 @@ void loop()
     checkingForDeadEnd = false;
     turnCounter = 0;
 
-    checkForNewTile();
+    checkForStraightTile();
 
     onLine = checkPIDSensors();
 
-    if (deadEndPossible && (sensor0 || sensor5)) {
-      //sendLogMessage(1);
+    if (sensor0) {
       deadEndPossible = false;
       noDeadEndCounter = 0;
-      deadEndCounter = 0;
-    }
-
-    if (sensor0) {
       turningRight = true;
 
       if ((millis() - lastDirectionChange) > 1000) {
@@ -163,15 +153,21 @@ void loop()
       }
     }
     else if (checkPIDSensors())
-    {
+    {      
+      deadEndPossible = false;
+      noDeadEndCounter = 0;
+      
       digitalWrite(dir_a, HIGH);
       digitalWrite(dir_b, LOW);
 
       deadEndCounter = 0;
       followLine();
     }
-    else if (sensor5) {
+    else if (sensor5) {      
+      deadEndPossible = false;
+      noDeadEndCounter = 0;
       turningLeft = true;
+      
       if ((millis() - lastDirectionChange) > 1000) {
         lastDirectionChange = millis();
 
@@ -187,20 +183,22 @@ void loop()
     {
       checkForDeadEnd();
     }
-  }
 
-  if (!deadEndTurn) {
-    if (!deadEndPossible && noDeadEndCounter < 500) {
-      noDeadEndCounter++;
-    }
-    else
-    {
-      if (!deadEndPossible ) {
+    if (!deadEndTurn && !deadEndPossible) {
+      if (noDeadEndCounter < 500) {
+        noDeadEndCounter++;
+      }
+      else
+      {
         deadEndPossible = true;
+        noDeadEndCounter = 0;
+        Serial.println("Dead end possible");
         //sendLogMessage(2);
       }
     }
   }
+
+
 
 } // end main loop
 
@@ -215,15 +213,16 @@ void checkForDeadEnd() {
       deadEndCounter = 0;
     }
 
-    if (deadEndCounter >= 400) {
+    if (deadEndCounter >= 100) {
       direction = direction - 2;
-      if(direction == 8){
+      if (direction == 8) {
         direction = 12;
       }
-      else if(direction == 9){
-        direction = 13;        
+      else if (direction == 9) {
+        direction = 13;
       }
 
+      Serial.println("turning dead end...");
       deadEndPossible = false;
       deadEndCounter = 0;
       //sendLogMessage(7);
@@ -231,17 +230,6 @@ void checkForDeadEnd() {
       deadEndTurn = true;
     }
 
-  }
-}
-
-void checkDirections() {
-  if (sensor0)  {
-    if (sensor5) {
-      digitalWrite(dir_a, HIGH);
-      digitalWrite(dir_b, LOW);
-      analogWrite(pwm_a, maxMotorSpeed);
-      analogWrite(pwm_b, maxMotorSpeed);
-    }
   }
 }
 
@@ -316,19 +304,19 @@ void followLine()
 int whiteCount = 0;
 bool whiteAvailable = true;
 
-bool checkForNewTile() {
+bool checkForStraightTile() {
   if (!timer && !sensor1 && !sensor2 && !sensor3 && !sensor4)
   {
     timer = true;
-    Serial.println("Timer Started...");
+    //Serial.println("Timer Started...");
   }
 
   if (timer) {
     if (!sensor1 && !sensor2 && !sensor3 && !sensor4 && whiteAvailable) {
       whiteCount++;
       whiteAvailable = false;
-      Serial.print("White Count: ");
-      Serial.println(whiteCount);
+      //Serial.print("White Count: ");
+      //Serial.println(whiteCount);
     }
     else if (checkPIDSensors()) {
       whiteAvailable = true;
@@ -344,7 +332,7 @@ bool checkForNewTile() {
         timerCount = 0;
         timer = false;
         whiteAvailable = true;
-        Serial.println("Timer Stopped Straight Tile Found...");
+        //Serial.println("Timer Stopped Straight Tile Found...");
         return true;
       }
     }
@@ -355,7 +343,7 @@ bool checkForNewTile() {
       timer = false;
       whiteCount = 0;
       timerCount = 0;
-      Serial.println("Timer Stopped Timeout...");
+      //Serial.println("Timer Stopped Timeout...");
       return false;
     }
   }
@@ -445,7 +433,6 @@ void calcPID() {
   previousError = error;
   error = avgReading - 2.5;
   totalError += error;
-  Serial.println(error);
 
   power = (kp * error) + (kd * (error - previousError)) + (ki * totalError);
 
