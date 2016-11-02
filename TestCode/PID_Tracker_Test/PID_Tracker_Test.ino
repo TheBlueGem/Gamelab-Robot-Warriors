@@ -112,7 +112,6 @@ void calcPID() {
   previousError = error;
   error = avgReading - 2.5;
   totalError += error;
-  Serial.println(error);
   
   power = (kp * error) + (kd * (error - previousError)) + (ki * totalError);
 
